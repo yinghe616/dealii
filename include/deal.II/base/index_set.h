@@ -105,6 +105,29 @@ public:
    */
   explicit IndexSet (const size_type size);
 
+#ifdef DEAL_II_WITH_CXX11
+  /**
+   * Copy constructor.
+   */
+  IndexSet (const IndexSet &) = default;
+
+  /**
+   * Copy assignment operator.
+   */
+  IndexSet &operator= (const IndexSet &) = default;
+
+  /**
+   * Move constructor. Create a new IndexSet by transferring the internal data
+   * of the input set.
+   */
+  IndexSet (IndexSet &&is);
+
+  /**
+   * Move assignment operator. Transfer the internal data of the input set into
+   * the current one.
+   */
+  IndexSet &operator= (IndexSet &&is);
+#endif
 
 #ifdef DEAL_II_WITH_TRILINOS
   /**
@@ -1218,13 +1241,55 @@ IndexSet::IndexSet (const size_type size)
 
 
 
+#ifdef DEAL_II_WITH_CXX11
+
+inline
+IndexSet::IndexSet (IndexSet &&is)
+  :
+  ranges (std::move(is.ranges)),
+  is_compressed (is.is_compressed),
+  index_space_size (is.index_space_size),
+  largest_range (is.largest_range)
+{
+  is.ranges.clear ();
+  is.is_compressed = true;
+  is.index_space_size = 0;
+  is.largest_range = numbers::invalid_unsigned_int;
+
+  compress ();
+}
+
+
+inline
+IndexSet &IndexSet::operator= (IndexSet &&is)
+{
+  ranges = std::move (is.ranges);
+  is_compressed = is.is_compressed;
+  index_space_size = is.index_space_size;
+  largest_range = is.largest_range;
+
+  is.ranges.clear ();
+  is.is_compressed = true;
+  is.index_space_size = 0;
+  is.largest_range = numbers::invalid_unsigned_int;
+
+  compress ();
+
+  return *this;
+}
+
+#endif
+
+
 inline
 void
 IndexSet::clear ()
 {
+  // reset so that there are no indices in the set any more; however,
+  // as documented, the index set retains its size
   ranges.clear ();
-  largest_range = 0;
   is_compressed = true;
+  largest_range = numbers::invalid_unsigned_int;
 }
 
 

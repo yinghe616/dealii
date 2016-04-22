@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -577,6 +577,23 @@ public:
    */
   BlockVectorBase ();
 
+#ifdef DEAL_II_WITH_CXX11
+  /**
+   * Copy constructor.
+   */
+  BlockVectorBase (const BlockVectorBase &V) = default;
+
+  /**
+   * Move constructor. Each block of the argument vector is moved into the current
+   * object if the underlying <code>VectorType</code> is move-constructible,
+   * otherwise they are copied.
+   *
+   * @note This constructor is only available if deal.II is configured with
+   * C++11 support.
+   */
+  BlockVectorBase (BlockVectorBase &&/*V*/) = default;
+#endif
+
   /**
    * Update internal structures after resizing vectors. Whenever you reinited
    * a block of a block vector, the internal data structures are corrupted.
@@ -722,6 +739,15 @@ public:
    */
   BlockVectorBase &
   operator= (const BlockVectorBase &V);
+
+#ifdef DEAL_II_WITH_CXX11
+  /**
+   * Move assignment operator. Move each block of the given argument
+   * vector into the current object if `VectorType` is
+   * move-constructible, otherwise copy them.
+   */
+  BlockVectorBase &operator= (BlockVectorBase &&/*V*/) = default;
+#endif
 
   /**
    * Copy operator for template arguments of different types.
@@ -1468,6 +1494,7 @@ namespace internal
 } //namespace internal
 
 
+
 template <class VectorType>
 inline
 BlockVectorBase<VectorType>::BlockVectorBase ()
@@ -1686,10 +1713,11 @@ typename BlockVectorBase<VectorType>::value_type
 BlockVectorBase<VectorType>::mean_value () const
 {
   value_type sum = 0.;
+  // need to do static_cast as otherwise it won't work with value_type=complex<T>
   for (size_type i=0; i<n_blocks(); ++i)
-    sum += components[i].mean_value() * components[i].size();
+    sum += components[i].mean_value() * static_cast<double>(components[i].size());
 
-  return sum/size();
+  return sum/static_cast<double>(size());
 }
 
 

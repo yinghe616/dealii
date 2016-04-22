@@ -17,7 +17,7 @@
 #define dealii__mg_base_h
 
 /*
- * This file contains MGLevelObject and some abstract base classes
+ * This file contains some abstract base classes
  * used by Multigrid.
  */
 
@@ -28,8 +28,6 @@
 
 
 DEAL_II_NAMESPACE_OPEN
-
-template <typename> class MGLevelObject;
 
 /*!@addtogroup mg */
 /*@{*/

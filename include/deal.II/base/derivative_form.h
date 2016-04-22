@@ -81,7 +81,6 @@ public:
    */
   DerivativeForm   &operator = (const DerivativeForm <order, dim, spacedim, Number> &);
 
-
   /**
    * Assignment operator.
    */
@@ -110,7 +109,6 @@ public:
    */
   DerivativeForm<1, spacedim, dim, Number> transpose () const;
 
-
   /**
    * Computes the volume element associated with the jacobian of the
    * transformation F. That is to say if $DF$ is square, it computes
@@ -118,16 +116,15 @@ public:
    */
   double determinant () const;
 
-
   /**
-   * Assuming (*this) stores the jacobian of the mapping F, it computes its
-   * covariant matrix, namely $DF*G^{-1}$, where $G = DF^{t}*DF$. If $DF$ is
-   * square, covariant from gives $DF^{-t}$.
+   * Assuming that the current object stores the Jacobian of a mapping
+   * $F$, then the current function computes the <i>covariant</i> form
+   * of the derivative, namely $(\nabla F)G^{-1}$, where $G = (\nabla
+   * F)^{T}*(\nabla F)$. If $\nabla F$ is a square matrix (i.e., $F:
+   * {\mathbb R}^n \mapsto {\mathbb R}^n$), then this function
+   * simplifies to computing $\nabla F^{-T}$.
    */
   DerivativeForm<1, dim, spacedim, Number> covariant_form() const;
-
-
-
 
   /**
    * Determine an estimate for the memory consumption (in bytes) of this
@@ -142,7 +139,6 @@ public:
                   int,
                   << "Invalid DerivativeForm index " << arg1);
 
-
 private:
   /**
    * Auxiliary function that computes (*this) * T^{t}
@@ -150,13 +146,10 @@ private:
   DerivativeForm<1, dim, spacedim, Number> times_T_t (Tensor<2,dim,Number> T) const;
 
 
-private:
   /**
    * Array of tensors holding the subelements.
    */
   Tensor<order,dim,Number> tensor[spacedim];
-
-
 };
 
 
@@ -359,27 +352,22 @@ inline
 DerivativeForm<1,dim,spacedim,Number>
 DerivativeForm<order,dim,spacedim,Number>::covariant_form() const
 {
-
   if (dim == spacedim)
     {
-
-      Tensor<2,dim,Number> DF_t (dealii::transpose(invert(  (Tensor<2,dim,Number>)(*this)   )));
-      DerivativeForm<1,dim, spacedim> result = DF_t;
-      return (result);
+      const Tensor<2,dim,Number> DF_t
+        = dealii::transpose (invert (static_cast<Tensor<2,dim,Number> >(*this)));
+      return DerivativeForm<1,dim, spacedim> (DF_t);
     }
   else
     {
-
-      DerivativeForm<1,spacedim,dim> DF_t = this->transpose();
+      const DerivativeForm<1,spacedim,dim> DF_t = this->transpose();
       Tensor<2,dim,Number> G; //First fundamental form
       for (unsigned int i=0; i<dim; ++i)
         for (unsigned int j=0; j<dim; ++j)
           G[i][j] = DF_t[i] * DF_t[j];
 
       return (this->times_T_t(invert(G)));
-
     }
-
 }
 
 
