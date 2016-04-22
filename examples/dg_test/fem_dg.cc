@@ -473,19 +473,19 @@ private:
     Vector<double>                      DG_old_old_composition_solution;
     Vector<double>                      DG_old_old_old_composition_solution;
     Vector<double>                      DG_composition_rhs;
-/*
-    Vector<double>                      DG_composition_q1_solution;
-    Vector<double>                      DG_old_composition_q1_solution;
-    Vector<double>                      DG_old_old_composition_q1_solution;
-    Vector<double>                      DG_old_old_old_composition_q1_solution;
-    Vector<double>                      DG_composition_q1_rhs;
+    /*
+        Vector<double>                      DG_composition_q1_solution;
+        Vector<double>                      DG_old_composition_q1_solution;
+        Vector<double>                      DG_old_old_composition_q1_solution;
+        Vector<double>                      DG_old_old_old_composition_q1_solution;
+        Vector<double>                      DG_composition_q1_rhs;
 
-    Vector<double>                      DG_composition_q2_solution;
-    Vector<double>                      DG_old_composition_q2_solution;
-    Vector<double>                      DG_old_old_composition_q2_solution;
-    Vector<double>                      DG_composition_q2_rhs;
+        Vector<double>                      DG_composition_q2_solution;
+        Vector<double>                      DG_old_composition_q2_solution;
+        Vector<double>                      DG_old_old_composition_q2_solution;
+        Vector<double>                      DG_composition_q2_rhs;
 
-*/
+    */
 
     double                              time;
     double                              time_step;
@@ -516,22 +516,22 @@ private:
     typedef MeshWorker::DoFInfo<dim> DoFInfo;
 
     void integrate_cell_term_mass (DoFInfo &dinfo,
-        CellInfo &info,
-        TrilinosWrappers::BlockVector &coef);
+                                   CellInfo &info,
+                                   TrilinosWrappers::BlockVector &coef);
     void integrate_cell_term_advection (DoFInfo &dinfo,
-        CellInfo &info,
-        TrilinosWrappers::BlockVector &coef);
+                                        CellInfo &info,
+                                        TrilinosWrappers::BlockVector &coef);
     void integrate_cell_term_source (DoFInfo &dinfo,
-        CellInfo &info,
-        TrilinosWrappers::BlockVector &coef);
+                                     CellInfo &info,
+                                     TrilinosWrappers::BlockVector &coef);
     void integrate_boundary_term_advection (DoFInfo &dinfo,
-        CellInfo &info,
-        TrilinosWrappers::BlockVector &coef);
+                                            CellInfo &info,
+                                            TrilinosWrappers::BlockVector &coef);
     void integrate_face_term_advection (DoFInfo &dinfo1,
-        DoFInfo &dinfo2,
-        CellInfo &info1,
-        CellInfo &info2,
-        TrilinosWrappers::BlockVector &coef);
+                                        DoFInfo &dinfo2,
+                                        CellInfo &info1,
+                                        CellInfo &info2,
+                                        TrilinosWrappers::BlockVector &coef);
 };
 
 // @sect4{The local integrators}
@@ -541,45 +541,45 @@ private:
 // matrix and right hand side on cells and faces.
 template <int dim>
 void BoussinesqFlowProblem<dim>::integrate_cell_term_advection (DoFInfo &dinfo,
-    CellInfo &info,
-    TrilinosWrappers::BlockVector &coef)
+        CellInfo &info,
+        TrilinosWrappers::BlockVector &coef)
 {
-  const FEValuesBase<dim> &fe_v = info.fe_values();
-  FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
-  const std::vector<double> &JxW = fe_v.get_JxW_values ();
+    const FEValuesBase<dim> &fe_v = info.fe_values();
+    FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+    const std::vector<double> &JxW = fe_v.get_JxW_values ();
 
-  //construct stokes_cell and fe_values
-  typename DoFHandler<dim>::active_cell_iterator stokes_cell(&(dinfo.cell->get_triangulation()),
-      dinfo.cell->level(),
-      dinfo.cell->index(),
-      &stokes_dof_handler);
-  const QGauss<dim> quadrature_formula(composition_degree+1);
-  const unsigned int n_q_points = quadrature_formula.size();
-  FEValues<dim> stokes_fe_values(stokes_fe,quadrature_formula,update_values);
-  stokes_fe_values.reinit(stokes_cell);
+    //construct stokes_cell and fe_values
+    typename DoFHandler<dim>::active_cell_iterator stokes_cell(&(dinfo.cell->get_triangulation()),
+            dinfo.cell->level(),
+            dinfo.cell->index(),
+            &stokes_dof_handler);
+    const QGauss<dim> quadrature_formula(composition_degree+1);
+    const unsigned int n_q_points = quadrature_formula.size();
+    FEValues<dim> stokes_fe_values(stokes_fe,quadrature_formula,update_values);
+    stokes_fe_values.reinit(stokes_cell);
 
-  const FEValuesExtractors::Vector velocities (0);
-  const FEValuesExtractors::Scalar pressure (dim);
+    const FEValuesExtractors::Vector velocities (0);
+    const FEValuesExtractors::Scalar pressure (dim);
 
-  std::vector<double> pressure_values (n_q_points);
-  std::vector<Tensor<1,dim> > velocity_values(n_q_points);
+    std::vector<double> pressure_values (n_q_points);
+    std::vector<Tensor<1,dim> > velocity_values(n_q_points);
 
-  stokes_fe_values[velocities].get_function_values (coef,
-      velocity_values);
-  stokes_fe_values[pressure].get_function_values (coef,
-      pressure_values);
+    stokes_fe_values[velocities].get_function_values (coef,
+            velocity_values);
+    stokes_fe_values[pressure].get_function_values (coef,
+            pressure_values);
 
-  for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
-  {
-    for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
-    {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-      {
-        local_matrix(i,j) -= velocity_values[point]*fe_v.shape_grad(i,point)*
-          fe_v.shape_value(j,point) *
-          JxW[point];
-      }
+    for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+    {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            {
+                local_matrix(i,j) -= velocity_values[point]*fe_v.shape_grad(i,point)*
+                                     fe_v.shape_value(j,point) *
+                                     JxW[point];
+            }
+        }
     }
-  }
 }
 
 template <int dim>
@@ -697,85 +697,85 @@ void BoussinesqFlowProblem<dim>::integrate_boundary_term_advection (DoFInfo &din
 
 template <int dim>
 void BoussinesqFlowProblem<dim>::integrate_face_term_advection (DoFInfo &dinfo1,
-    DoFInfo &dinfo2,
-    CellInfo &info1,
-    CellInfo &info2,
-    TrilinosWrappers::BlockVector &coef)
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        TrilinosWrappers::BlockVector &coef)
 {
-  const FEValuesBase<dim> &fe_v = info1.fe_values();
+    const FEValuesBase<dim> &fe_v = info1.fe_values();
 
-  // For additional shape functions, we have to ask the neighbors
-  // FEValuesBase.
-  const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+    // For additional shape functions, we have to ask the neighbors
+    // FEValuesBase.
+    const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
 
-  FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
-  FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
-  FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
-  FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+    FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+    FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+    FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+    FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
 
-  const std::vector<double> &JxW = fe_v.get_JxW_values ();
-  const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+    const std::vector<double> &JxW = fe_v.get_JxW_values ();
+    const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
 
-  //construct stokes_cell and fe_values
-  typename DoFHandler<dim>::active_cell_iterator stokes_cell(&(dinfo1.cell->get_triangulation()),
-      dinfo1.cell->level(),
-      dinfo1.cell->index(),
-      &stokes_dof_handler);
-  
-  const QGauss<dim-1> quadrature_formula(composition_degree+1);
-  const unsigned int n_q_points = quadrature_formula.size();
+    //construct stokes_cell and fe_values
+    typename DoFHandler<dim>::active_cell_iterator stokes_cell(&(dinfo1.cell->get_triangulation()),
+            dinfo1.cell->level(),
+            dinfo1.cell->index(),
+            &stokes_dof_handler);
 
-  FEFaceValues<dim> stokes_fe_values(stokes_fe,quadrature_formula,update_values);
-  stokes_fe_values.reinit(stokes_cell,dinfo1.face_number);
+    const QGauss<dim-1> quadrature_formula(composition_degree+1);
+    const unsigned int n_q_points = quadrature_formula.size();
 
-  const FEValuesExtractors::Vector velocities (0);
+    FEFaceValues<dim> stokes_fe_values(stokes_fe,quadrature_formula,update_values);
+    stokes_fe_values.reinit(stokes_cell,dinfo1.face_number);
 
-  std::vector<Tensor<1,dim> > velocity_values(n_q_points);
+    const FEValuesExtractors::Vector velocities (0);
 
-  stokes_fe_values[velocities].get_function_values (coef,
-      velocity_values);
+    std::vector<Tensor<1,dim> > velocity_values(n_q_points);
 
-  for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
-  {
-    const double beta_n=velocity_values[point] * normals[point];
-    if (beta_n>=0)
+    stokes_fe_values[velocities].get_function_values (coef,
+            velocity_values);
+
+    for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
     {
-      // This term we've already seen:
-      for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
-        for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-          u1_v1_matrix(i,j) += beta_n *
-            fe_v.shape_value(j,point) *
-            fe_v.shape_value(i,point) *
-            JxW[point];
+        const double beta_n=velocity_values[point] * normals[point];
+        if (beta_n>=0)
+        {
+            // This term we've already seen:
+            for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+                for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+                    u1_v1_matrix(i,j) += beta_n *
+                                         fe_v.shape_value(j,point) *
+                                         fe_v.shape_value(i,point) *
+                                         JxW[point];
 
-      // We additionally assemble the term $(\beta\cdot n u,\hat
-      // v)_{\partial \kappa_+}$,
-      for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
-        for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-          u1_v2_matrix(k,j) -= beta_n *
-            fe_v.shape_value(j,point) *
-            fe_v_neighbor.shape_value(k,point) *
-            JxW[point];
+            // We additionally assemble the term $(\beta\cdot n u,\hat
+            // v)_{\partial \kappa_+}$,
+            for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+                for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+                    u1_v2_matrix(k,j) -= beta_n *
+                                         fe_v.shape_value(j,point) *
+                                         fe_v_neighbor.shape_value(k,point) *
+                                         JxW[point];
+        }
+        else
+        {
+            // This one we've already seen, too:
+            for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+                for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
+                    u2_v1_matrix(i,l) += beta_n *
+                                         fe_v_neighbor.shape_value(l,point) *
+                                         fe_v.shape_value(i,point) *
+                                         JxW[point];
+            // And this is another new one: $(\beta\cdot n \hat u,\hat
+            // v)_{\partial \kappa_-}$:
+            for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+                for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
+                    u2_v2_matrix(k,l) -= beta_n *
+                                         fe_v_neighbor.shape_value(l,point) *
+                                         fe_v_neighbor.shape_value(k,point) *
+                                         JxW[point];
+        }
     }
-    else
-    {
-      // This one we've already seen, too:
-      for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
-        for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-          u2_v1_matrix(i,l) += beta_n *
-            fe_v_neighbor.shape_value(l,point) *
-            fe_v.shape_value(i,point) *
-            JxW[point];
-      // And this is another new one: $(\beta\cdot n \hat u,\hat
-      // v)_{\partial \kappa_-}$:
-      for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
-        for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-          u2_v2_matrix(k,l) -= beta_n *
-            fe_v_neighbor.shape_value(l,point) *
-            fe_v_neighbor.shape_value(k,point) *
-            JxW[point];
-    }
-  }
 }
 
 
@@ -1270,7 +1270,7 @@ void BoussinesqFlowProblem<dim>::apply_bound_preserving_limiter ()
     const QGauss<dim-1> quadrature_formula_x(composition_degree+1);
     const QGaussLobatto<dim-1> quadrature_formula_y(composition_degree+1);
 #endif
-    
+
     const QGauss<dim> quadrature_formula(composition_degree+1);
     const QAnisotropic<dim> quadrature_formula_xy(quadrature_formula_x,quadrature_formula_y);
     const QAnisotropic<dim> quadrature_formula_yx(quadrature_formula_y,quadrature_formula_x);
@@ -1278,7 +1278,7 @@ void BoussinesqFlowProblem<dim>::apply_bound_preserving_limiter ()
     const unsigned int n_q_points = quadrature_formula.size();
     const unsigned int n_q_points_xy = quadrature_formula_xy.size();
     const unsigned int n_q_points_yx = quadrature_formula_yx.size();
-    
+
     FEValues<dim>  composition_fe_values (composition_fe, quadrature_formula,
                                           update_values    |
                                           update_gradients |
@@ -1286,21 +1286,21 @@ void BoussinesqFlowProblem<dim>::apply_bound_preserving_limiter ()
                                           update_quadrature_points  |
                                           update_JxW_values);
     std::vector<double>   composition_values(n_q_points);
-    
+
     FEValues<dim>  composition_fe_values_xy (composition_fe, quadrature_formula_xy,
-                                          update_values    |
-                                          update_gradients |
-                                          update_hessians  |
-                                          update_quadrature_points  |
-                                          update_JxW_values);
+            update_values    |
+            update_gradients |
+            update_hessians  |
+            update_quadrature_points  |
+            update_JxW_values);
     std::vector<double>   composition_values_xy (n_q_points_xy);
 
     FEValues<dim>  composition_fe_values_yx (composition_fe, quadrature_formula_yx,
-                                          update_values    |
-                                          update_gradients |
-                                          update_hessians  |
-                                          update_quadrature_points  |
-                                          update_JxW_values);
+            update_values    |
+            update_gradients |
+            update_hessians  |
+            update_quadrature_points  |
+            update_JxW_values);
     std::vector<double>   composition_values_yx (n_q_points_yx);
 
     const unsigned int dofs_per_cell   = composition_fe.dofs_per_cell;
@@ -1337,27 +1337,27 @@ void BoussinesqFlowProblem<dim>::apply_bound_preserving_limiter ()
                     composition_values_xy);
             for (unsigned int q=0; q<n_q_points_xy; ++q)
             {
-              T_cell_average+= composition_values_xy[q]
-                *composition_fe_values_xy.JxW(q);
-              T_cell_area+= 1.0
-                *composition_fe_values_xy.JxW(q);
-              min_composition = std::min<double> (min_composition,
-                  composition_values_xy[q]);
-              max_composition = std::max<double> (max_composition,
-                  composition_values_xy[q]);
+                T_cell_average+= composition_values_xy[q]
+                                 *composition_fe_values_xy.JxW(q);
+                T_cell_area+= 1.0
+                              *composition_fe_values_xy.JxW(q);
+                min_composition = std::min<double> (min_composition,
+                                                    composition_values_xy[q]);
+                max_composition = std::max<double> (max_composition,
+                                                    composition_values_xy[q]);
             }
-            
+
             // Need to divide the area of the cell
             T_cell_average/=T_cell_area;
-            
+
             for (unsigned int q=0; q<n_q_points_yx; ++q)
             {
-              min_composition = std::min<double> (min_composition,
-                  composition_values_yx[q]);
-              max_composition = std::max<double> (max_composition,
-                  composition_values_yx[q]);
+                min_composition = std::min<double> (min_composition,
+                                                    composition_values_yx[q]);
+                max_composition = std::max<double> (max_composition,
+                                                    composition_values_yx[q]);
             }
-            
+
             //Define theta
             double theta_T=std::min<double>(1,abs((EquationData::Max_T-T_cell_average)/(max_composition-T_cell_average)));
             theta_T=std::min<double>(theta_T,abs((EquationData::Min_T-T_cell_average)/(min_composition-T_cell_average)));
@@ -1382,44 +1382,44 @@ void BoussinesqFlowProblem<dim>::apply_bound_preserving_limiter ()
 
         }
         composition_solution=DG_composition_solution;
-#if 0 
+#if 0
         const Point<dim> cell_center = cell->center();
         if (   (cell_center(0)<=.675)
-            && (cell_center(0)>=.325)
-            && (cell_center(1)<=.9)
-            && (cell_center(1)>=.00001)
+                && (cell_center(0)>=.325)
+                && (cell_center(1)<=.9)
+                && (cell_center(1)>=.00001)
            )
         {
 #if 1
-          composition_fe_values.reinit (cell);
-          composition_fe_values.get_function_values (DG_composition_solution,
-              composition_values);
-          local_compositional_integrals=0;
-          for (unsigned int q=0; q<n_q_points; ++q)
-          {
-            local_compositional_integrals+= composition_values[q]
-              *composition_fe_values.JxW(q);
-          }
-          global_compositional_integrals+=local_compositional_integrals;
-#else   
-          composition_fe_values_xy.reinit (cell);
-          composition_fe_values_xy.get_function_values (DG_composition_solution,
-              composition_values_xy);
-          local_compositional_integrals=0;
-          for (unsigned int q=0; q<n_q_points_xy; ++q)
-          {
-            local_compositional_integrals+= composition_values_xy[q]
-              *composition_fe_values_xy.JxW(q);
-          }
-          global_compositional_integrals+=local_compositional_integrals;
+            composition_fe_values.reinit (cell);
+            composition_fe_values.get_function_values (DG_composition_solution,
+                    composition_values);
+            local_compositional_integrals=0;
+            for (unsigned int q=0; q<n_q_points; ++q)
+            {
+                local_compositional_integrals+= composition_values[q]
+                                                *composition_fe_values.JxW(q);
+            }
+            global_compositional_integrals+=local_compositional_integrals;
+#else
+            composition_fe_values_xy.reinit (cell);
+            composition_fe_values_xy.get_function_values (DG_composition_solution,
+                    composition_values_xy);
+            local_compositional_integrals=0;
+            for (unsigned int q=0; q<n_q_points_xy; ++q)
+            {
+                local_compositional_integrals+= composition_values_xy[q]
+                                                *composition_fe_values_xy.JxW(q);
+            }
+            global_compositional_integrals+=local_compositional_integrals;
 #endif
         }
 
     }
 
     std::cout << "total compositional mass is \n"
-      << global_compositional_integrals
-      << std::endl;
+              << global_compositional_integrals
+              << std::endl;
 #endif
 }
 
@@ -1658,155 +1658,155 @@ BoussinesqFlowProblem<dim>::build_stokes_preconditioner ()
 template <int dim>
 void BoussinesqFlowProblem<dim>::assemble_stokes_system ()
 {
-  std::cout << "   Assembling..." << std::flush;
-
-  if (rebuild_stokes_matrix == true)
-    stokes_matrix=0;
-
-  stokes_rhs=0;
-
-  const QGauss<dim> quadrature_formula (stokes_degree+2);
-  FEValues<dim>     stokes_fe_values (stokes_fe, quadrature_formula,
-      update_values    |
-      update_quadrature_points  |
-      update_JxW_values |
-      (rebuild_stokes_matrix == true
-       ?
-       update_gradients
-       :
-       UpdateFlags(0)));
-
-  FEValues<dim> composition_fe_values (composition_fe, quadrature_formula,
-      update_values);
-
-  const unsigned int   dofs_per_cell   = stokes_fe.dofs_per_cell;
-  const unsigned int   n_q_points      = quadrature_formula.size();
-
-  FullMatrix<double>   local_matrix (dofs_per_cell, dofs_per_cell);
-  Vector<double>       local_rhs    (dofs_per_cell);
-
-  std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
-
-  // Next we need a vector that will contain the values of the composition
-  // solution at the previous time level at the quadrature points to
-  // assemble the source term in the right hand side of the momentum
-  // equation. Let's call this vector <code>old_solution_values</code>.
-  //
-  // The set of vectors we create next hold the evaluations of the basis
-  // functions as well as their gradients and symmetrized gradients that
-  // will be used for creating the matrices. Putting these into their own
-  // arrays rather than asking the FEValues object for this information each
-  // time it is needed is an optimization to accelerate the assembly
-  // process, see step-22 for details.
-  //
-  // The last two declarations are used to extract the individual blocks
-  // (velocity, pressure, composition) from the total FE system.
-  std::vector<double>               old_composition_values(n_q_points);
-
-  std::vector<Tensor<1,dim> >          phi_u       (dofs_per_cell);
-  std::vector<SymmetricTensor<2,dim> > grads_phi_u (dofs_per_cell);
-  std::vector<double>                  div_phi_u   (dofs_per_cell);
-  std::vector<double>                  phi_p       (dofs_per_cell);
-
-  const FEValuesExtractors::Vector velocities (0);
-  const FEValuesExtractors::Scalar pressure (dim);
-
-  // Now start the loop over all cells in the problem. We are working on two
-  // different DoFHandlers for this assembly routine, so we must have two
-  // different cell iterators for the two objects in use. This might seem a
-  // bit peculiar, since both the Stokes system and the composition system
-  // use the same grid, but that's the only way to keep degrees of freedom
-  // in sync. The first statements within the loop are again all very
-  // familiar, doing the update of the finite element data as specified by
-  // the update flags, zeroing out the local arrays and getting the values
-  // of the old solution at the quadrature points. Then we are ready to loop
-  // over the quadrature points on the cell.
-  typename DoFHandler<dim>::active_cell_iterator
-    cell = stokes_dof_handler.begin_active(),
-         endc = stokes_dof_handler.end();
-  typename DoFHandler<dim>::active_cell_iterator
-    composition_cell = composition_dof_handler.begin_active();
-
-  for (; cell!=endc; ++cell, ++composition_cell)
-  {
-    stokes_fe_values.reinit (cell);
-    composition_fe_values.reinit (composition_cell);
-
-    local_matrix = 0;
-    local_rhs = 0;
-
-    composition_fe_values.get_function_values (old_composition_solution,
-        old_composition_values);
-
-    for (unsigned int q=0; q<n_q_points; ++q)
-    {
-      const double old_composition = old_composition_values[q];
-
-      // Next we extract the values and gradients of basis functions
-      // relevant to the terms in the inner products. As shown in
-      // step-22 this helps accelerate assembly.
-      //
-      // Once this is done, we start the loop over the rows and columns
-      // of the local matrix and feed the matrix with the relevant
-      // products. The right hand side is filled with the forcing term
-      // driven by composition in direction of gravity (which is
-      // vertical in our example).  Note that the right hand side term
-      // is always generated, whereas the matrix contributions are only
-      // updated when it is requested by the
-      // <code>rebuild_matrices</code> flag.
-      for (unsigned int k=0; k<dofs_per_cell; ++k)
-      {
-        phi_u[k] = stokes_fe_values[velocities].value (k,q);
-        if (rebuild_stokes_matrix)
-        {
-          grads_phi_u[k] = stokes_fe_values[velocities].symmetric_gradient(k,q);
-          div_phi_u[k]   = stokes_fe_values[velocities].divergence (k, q);
-          phi_p[k]       = stokes_fe_values[pressure].value (k, q);
-        }
-      }
-
-      if (rebuild_stokes_matrix)
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
-          for (unsigned int j=0; j<dofs_per_cell; ++j)
-            local_matrix(i,j) += ((EquationData::eta_0
-                  +(EquationData::eta_1-EquationData::eta_0)*old_composition) *
-                2* (grads_phi_u[i] * grads_phi_u[j])
-                - div_phi_u[i] * phi_p[j]
-                - phi_p[i] * div_phi_u[j])
-              * stokes_fe_values.JxW(q);
-      const Point<dim> gravity = -( (dim == 2) ? (Point<dim> (0,1)) :
-          (Point<dim> (0,0,1)) );
-      for (unsigned int i=0; i<dofs_per_cell; ++i)
-        local_rhs(i) += (-(EquationData::density_0
-              +(EquationData::density_1-EquationData::density_0)*old_composition) *
-            EquationData::beta *
-            gravity * phi_u[i]) *
-          stokes_fe_values.JxW(q);
-    }
-
-    // The last step in the loop over all cells is to enter the local
-    // contributions into the global matrix and vector structures to the
-    // positions specified in <code>local_dof_indices</code>.  Again, we
-    // let the ConstraintMatrix class do the insertion of the cell matrix
-    // elements to the global matrix, which already condenses the hanging
-    // node constraints.
-    cell->get_dof_indices (local_dof_indices);
+    std::cout << "   Assembling..." << std::flush;
 
     if (rebuild_stokes_matrix == true)
-      stokes_constraints.distribute_local_to_global (local_matrix,
-          local_rhs,
-          local_dof_indices,
-          stokes_matrix,
-          stokes_rhs);
-    else
-      stokes_constraints.distribute_local_to_global (local_rhs,
-          local_dof_indices,
-          stokes_rhs);
-  }
+        stokes_matrix=0;
 
-  rebuild_stokes_matrix = false;
+    stokes_rhs=0;
 
-  std::cout << std::endl;
+    const QGauss<dim> quadrature_formula (stokes_degree+2);
+    FEValues<dim>     stokes_fe_values (stokes_fe, quadrature_formula,
+                                        update_values    |
+                                        update_quadrature_points  |
+                                        update_JxW_values |
+                                        (rebuild_stokes_matrix == true
+                                         ?
+                                         update_gradients
+                                         :
+                                         UpdateFlags(0)));
+
+    FEValues<dim> composition_fe_values (composition_fe, quadrature_formula,
+                                         update_values);
+
+    const unsigned int   dofs_per_cell   = stokes_fe.dofs_per_cell;
+    const unsigned int   n_q_points      = quadrature_formula.size();
+
+    FullMatrix<double>   local_matrix (dofs_per_cell, dofs_per_cell);
+    Vector<double>       local_rhs    (dofs_per_cell);
+
+    std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+
+    // Next we need a vector that will contain the values of the composition
+    // solution at the previous time level at the quadrature points to
+    // assemble the source term in the right hand side of the momentum
+    // equation. Let's call this vector <code>old_solution_values</code>.
+    //
+    // The set of vectors we create next hold the evaluations of the basis
+    // functions as well as their gradients and symmetrized gradients that
+    // will be used for creating the matrices. Putting these into their own
+    // arrays rather than asking the FEValues object for this information each
+    // time it is needed is an optimization to accelerate the assembly
+    // process, see step-22 for details.
+    //
+    // The last two declarations are used to extract the individual blocks
+    // (velocity, pressure, composition) from the total FE system.
+    std::vector<double>               old_composition_values(n_q_points);
+
+    std::vector<Tensor<1,dim> >          phi_u       (dofs_per_cell);
+    std::vector<SymmetricTensor<2,dim> > grads_phi_u (dofs_per_cell);
+    std::vector<double>                  div_phi_u   (dofs_per_cell);
+    std::vector<double>                  phi_p       (dofs_per_cell);
+
+    const FEValuesExtractors::Vector velocities (0);
+    const FEValuesExtractors::Scalar pressure (dim);
+
+    // Now start the loop over all cells in the problem. We are working on two
+    // different DoFHandlers for this assembly routine, so we must have two
+    // different cell iterators for the two objects in use. This might seem a
+    // bit peculiar, since both the Stokes system and the composition system
+    // use the same grid, but that's the only way to keep degrees of freedom
+    // in sync. The first statements within the loop are again all very
+    // familiar, doing the update of the finite element data as specified by
+    // the update flags, zeroing out the local arrays and getting the values
+    // of the old solution at the quadrature points. Then we are ready to loop
+    // over the quadrature points on the cell.
+    typename DoFHandler<dim>::active_cell_iterator
+    cell = stokes_dof_handler.begin_active(),
+    endc = stokes_dof_handler.end();
+    typename DoFHandler<dim>::active_cell_iterator
+    composition_cell = composition_dof_handler.begin_active();
+
+    for (; cell!=endc; ++cell, ++composition_cell)
+    {
+        stokes_fe_values.reinit (cell);
+        composition_fe_values.reinit (composition_cell);
+
+        local_matrix = 0;
+        local_rhs = 0;
+
+        composition_fe_values.get_function_values (old_composition_solution,
+                old_composition_values);
+
+        for (unsigned int q=0; q<n_q_points; ++q)
+        {
+            const double old_composition = old_composition_values[q];
+
+            // Next we extract the values and gradients of basis functions
+            // relevant to the terms in the inner products. As shown in
+            // step-22 this helps accelerate assembly.
+            //
+            // Once this is done, we start the loop over the rows and columns
+            // of the local matrix and feed the matrix with the relevant
+            // products. The right hand side is filled with the forcing term
+            // driven by composition in direction of gravity (which is
+            // vertical in our example).  Note that the right hand side term
+            // is always generated, whereas the matrix contributions are only
+            // updated when it is requested by the
+            // <code>rebuild_matrices</code> flag.
+            for (unsigned int k=0; k<dofs_per_cell; ++k)
+            {
+                phi_u[k] = stokes_fe_values[velocities].value (k,q);
+                if (rebuild_stokes_matrix)
+                {
+                    grads_phi_u[k] = stokes_fe_values[velocities].symmetric_gradient(k,q);
+                    div_phi_u[k]   = stokes_fe_values[velocities].divergence (k, q);
+                    phi_p[k]       = stokes_fe_values[pressure].value (k, q);
+                }
+            }
+
+            if (rebuild_stokes_matrix)
+                for (unsigned int i=0; i<dofs_per_cell; ++i)
+                    for (unsigned int j=0; j<dofs_per_cell; ++j)
+                        local_matrix(i,j) += ((EquationData::eta_0
+                                               +(EquationData::eta_1-EquationData::eta_0)*old_composition) *
+                                              2* (grads_phi_u[i] * grads_phi_u[j])
+                                              - div_phi_u[i] * phi_p[j]
+                                              - phi_p[i] * div_phi_u[j])
+                                             * stokes_fe_values.JxW(q);
+            const Point<dim> gravity = -( (dim == 2) ? (Point<dim> (0,1)) :
+                                          (Point<dim> (0,0,1)) );
+            for (unsigned int i=0; i<dofs_per_cell; ++i)
+                local_rhs(i) += (-(EquationData::density_0
+                                   +(EquationData::density_1-EquationData::density_0)*old_composition) *
+                                 EquationData::beta *
+                                 gravity * phi_u[i]) *
+                                stokes_fe_values.JxW(q);
+        }
+
+        // The last step in the loop over all cells is to enter the local
+        // contributions into the global matrix and vector structures to the
+        // positions specified in <code>local_dof_indices</code>.  Again, we
+        // let the ConstraintMatrix class do the insertion of the cell matrix
+        // elements to the global matrix, which already condenses the hanging
+        // node constraints.
+        cell->get_dof_indices (local_dof_indices);
+
+        if (rebuild_stokes_matrix == true)
+            stokes_constraints.distribute_local_to_global (local_matrix,
+                    local_rhs,
+                    local_dof_indices,
+                    stokes_matrix,
+                    stokes_rhs);
+        else
+            stokes_constraints.distribute_local_to_global (local_rhs,
+                    local_dof_indices,
+                    stokes_rhs);
+    }
+
+    rebuild_stokes_matrix = false;
+
+    std::cout << std::endl;
 }
 
 
@@ -1864,12 +1864,12 @@ void BoussinesqFlowProblem<dim>::assemble_composition_matrix ()
 
     auto integrate_cell_term_mass_bind=std::bind(&BoussinesqFlowProblem<dim>::integrate_cell_term_mass,this, std::placeholders::_1, std::placeholders::_2, this->stokes_solution);
     MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
-      (composition_dof_handler.begin_active(), composition_dof_handler.end(),
-       dof_info, info_box,
-       integrate_cell_term_mass_bind,
-       NULL,
-       NULL,
-       assembler);
+    (composition_dof_handler.begin_active(), composition_dof_handler.end(),
+     dof_info, info_box,
+     integrate_cell_term_mass_bind,
+     NULL,
+     NULL,
+     assembler);
 
     //DG_composition_rhs=rhs_tmp;//if there is a source term;//FIXME
     //copy the DG mass matrix to Trillinor mass matrix
@@ -1991,72 +1991,72 @@ void BoussinesqFlowProblem<dim>::solve ()
 
     // Next we set up the composition system and the right hand side using the
     {
-	if (timestep_number<=1)
-	{// SSP RK Stage 1
-    Vector<double> sol_tmp (composition_dof_handler.n_dofs());
-		DG_composition_advec_matrix.vmult(DG_composition_rhs,DG_old_composition_solution);
-		DG_composition_rhs*=-time_step;
-		DG_composition_mass_matrix.vmult(sol_tmp,DG_old_composition_solution);
-		DG_composition_rhs+=sol_tmp;
-		SolverControl solver_control (DG_composition_mass_matrix.m(),
-				1e-8*DG_composition_rhs.l2_norm());
-		SolverCG<> cg (solver_control);
+        if (timestep_number<=1)
+        {   // SSP RK Stage 1
+            Vector<double> sol_tmp (composition_dof_handler.n_dofs());
+            DG_composition_advec_matrix.vmult(DG_composition_rhs,DG_old_composition_solution);
+            DG_composition_rhs*=-time_step;
+            DG_composition_mass_matrix.vmult(sol_tmp,DG_old_composition_solution);
+            DG_composition_rhs+=sol_tmp;
+            SolverControl solver_control (DG_composition_mass_matrix.m(),
+                                          1e-8*DG_composition_rhs.l2_norm());
+            SolverCG<> cg (solver_control);
 
-		PreconditionBlockSSOR<SparseMatrix<double> > preconditioner;
-		preconditioner.initialize(DG_composition_mass_matrix, composition_fe.dofs_per_cell);
+            PreconditionBlockSSOR<SparseMatrix<double> > preconditioner;
+            preconditioner.initialize(DG_composition_mass_matrix, composition_fe.dofs_per_cell);
 
-		cg.solve (DG_composition_mass_matrix, DG_composition_solution,
-				DG_composition_rhs, preconditioner);
+            cg.solve (DG_composition_mass_matrix, DG_composition_solution,
+                      DG_composition_rhs, preconditioner);
 
-		std::cout << "   "
-			<< solver_control.last_step()
-			<< " CG iterations 1 for composition."
-			<< std::endl;
-		apply_bound_preserving_limiter();
-		// SSP RK Stage 2
-		DG_composition_advec_matrix.vmult(DG_composition_rhs,DG_composition_solution);
-		DG_composition_rhs*=-time_step*0.5;
-		DG_old_composition_solution+=DG_composition_solution;
-		DG_old_composition_solution*=0.5;
-		DG_composition_mass_matrix.vmult(sol_tmp,DG_old_composition_solution);
-		DG_composition_rhs+=sol_tmp;
+            std::cout << "   "
+                      << solver_control.last_step()
+                      << " CG iterations 1 for composition."
+                      << std::endl;
+            apply_bound_preserving_limiter();
+            // SSP RK Stage 2
+            DG_composition_advec_matrix.vmult(DG_composition_rhs,DG_composition_solution);
+            DG_composition_rhs*=-time_step*0.5;
+            DG_old_composition_solution+=DG_composition_solution;
+            DG_old_composition_solution*=0.5;
+            DG_composition_mass_matrix.vmult(sol_tmp,DG_old_composition_solution);
+            DG_composition_rhs+=sol_tmp;
 
-		preconditioner.initialize(DG_composition_mass_matrix, composition_fe.dofs_per_cell);
-		cg.solve (DG_composition_mass_matrix, DG_composition_solution,
-				DG_composition_rhs, preconditioner);
+            preconditioner.initialize(DG_composition_mass_matrix, composition_fe.dofs_per_cell);
+            cg.solve (DG_composition_mass_matrix, DG_composition_solution,
+                      DG_composition_rhs, preconditioner);
 
-		std::cout << "   "
-			<< solver_control.last_step()
-			<< " CG iterations 2 for composition."
-			<< std::endl;
-	}
-	else
-	{	// SSP 2nd multistep method
-		DG_composition_advec_matrix.vmult(DG_composition_rhs,DG_old_composition_solution);
-		DG_composition_rhs*=-time_step*1.5;
-    
-    Vector<double> rhs_tmp (composition_dof_handler.n_dofs());
-	  
-    DG_composition_mass_matrix.vmult(rhs_tmp,DG_old_old_old_composition_solution);
-		rhs_tmp*=0.25;
-		DG_composition_rhs+=rhs_tmp;
-		DG_composition_mass_matrix.vmult(rhs_tmp,DG_old_composition_solution);
-		rhs_tmp*=0.75;
-		DG_composition_rhs+=rhs_tmp;
+            std::cout << "   "
+                      << solver_control.last_step()
+                      << " CG iterations 2 for composition."
+                      << std::endl;
+        }
+        else
+        {   // SSP 2nd multistep method
+            DG_composition_advec_matrix.vmult(DG_composition_rhs,DG_old_composition_solution);
+            DG_composition_rhs*=-time_step*1.5;
 
-		SolverControl solver_control (DG_composition_mass_matrix.m(),
-				1e-8*DG_composition_rhs.l2_norm());
-		SolverCG<> cg (solver_control);
-		PreconditionBlockSSOR<SparseMatrix<double> > preconditioner;
-		preconditioner.initialize(DG_composition_mass_matrix, composition_fe.dofs_per_cell);
-		cg.solve (DG_composition_mass_matrix, DG_composition_solution,
-				DG_composition_rhs, preconditioner);
+            Vector<double> rhs_tmp (composition_dof_handler.n_dofs());
 
-		std::cout << "   "
-			<< solver_control.last_step()
-			<< " CG iterations SSP stage 2 for composition."
-			<< std::endl;
-	}
+            DG_composition_mass_matrix.vmult(rhs_tmp,DG_old_old_old_composition_solution);
+            rhs_tmp*=0.25;
+            DG_composition_rhs+=rhs_tmp;
+            DG_composition_mass_matrix.vmult(rhs_tmp,DG_old_composition_solution);
+            rhs_tmp*=0.75;
+            DG_composition_rhs+=rhs_tmp;
+
+            SolverControl solver_control (DG_composition_mass_matrix.m(),
+                                          1e-8*DG_composition_rhs.l2_norm());
+            SolverCG<> cg (solver_control);
+            PreconditionBlockSSOR<SparseMatrix<double> > preconditioner;
+            preconditioner.initialize(DG_composition_mass_matrix, composition_fe.dofs_per_cell);
+            cg.solve (DG_composition_mass_matrix, DG_composition_solution,
+                      DG_composition_rhs, preconditioner);
+
+            std::cout << "   "
+                      << solver_control.last_step()
+                      << " CG iterations SSP stage 2 for composition."
+                      << std::endl;
+        }
 
         composition_solution=DG_composition_solution;
 
@@ -2167,11 +2167,11 @@ void BoussinesqFlowProblem<dim>::refine_mesh (const unsigned int max_grid_level)
                                         estimated_error_per_cell);
 
     //GridRefinement::refine_and_coarsen_fixed_fraction (triangulation,
-      //      estimated_error_per_cell,
-        //    1, 0);
+    //      estimated_error_per_cell,
+    //    1, 0);
     GridRefinement::refine(triangulation,
-            estimated_error_per_cell,
-            .1);
+                           estimated_error_per_cell,
+                           .1);
 
 #endif
     if (triangulation.n_levels() > max_grid_level)
@@ -2280,7 +2280,7 @@ void BoussinesqFlowProblem<dim>::run ()
     global_Omega_diameter = GridTools::diameter (triangulation);
     triangulation.refine_global (initial_refinement);
     //triangulation.refine_global (8); //if want to use global uniform mesh
-    
+
     setup_dofs();
     setup_material_id();
     unsigned int pre_refinement_step = 0;
@@ -2393,7 +2393,7 @@ start_time_iteration:
         old_old_old_composition_solution = old_old_composition_solution;
         old_old_composition_solution    = old_composition_solution;
         old_composition_solution     = composition_solution;
-        
+
         DG_old_old_old_composition_solution = DG_old_old_composition_solution;
         DG_old_old_composition_solution    = DG_old_composition_solution;
         DG_old_composition_solution     = DG_composition_solution;
