@@ -1381,6 +1381,7 @@ void BoussinesqFlowProblem<dim>::apply_bound_preserving_limiter ()
             */
 
         }
+    }
         composition_solution=DG_composition_solution;
 #if 0
         const Point<dim> cell_center = cell->center();
@@ -2089,7 +2090,7 @@ void BoussinesqFlowProblem<dim>::solve ()
 template <int dim>
 void BoussinesqFlowProblem<dim>::output_results ()  const
 {
-    if (timestep_number % 10 != 0)
+    if (timestep_number % 20 != 0)
         return;
 
     std::vector<std::string> stokes_names (dim, "velocity");
@@ -2159,16 +2160,17 @@ template <int dim>
 void BoussinesqFlowProblem<dim>::refine_mesh (const unsigned int max_grid_level)
 {
     Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
-#if 1
     KellyErrorEstimator<dim>::estimate (composition_dof_handler,
                                         QGauss<dim-1>(composition_degree+1),
                                         typename FunctionMap<dim>::type(),
                                         composition_solution,
                                         estimated_error_per_cell);
 
-    //GridRefinement::refine_and_coarsen_fixed_fraction (triangulation,
-    //      estimated_error_per_cell,
-    //    1, 0);
+#if 1
+    GridRefinement::refine_and_coarsen_fixed_fraction (triangulation,
+          estimated_error_per_cell,
+        .99, 0.01);
+#else
     GridRefinement::refine(triangulation,
                            estimated_error_per_cell,
                            .1);
