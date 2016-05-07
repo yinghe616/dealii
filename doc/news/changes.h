@@ -120,6 +120,23 @@ inconvenience this causes.
 <h3>General</h3>
 
 <ol>
+ <li> New: Add a collection of classes to manage user's quadrature point data:
+ CellDataStorage, TransferableQuadraturePointData and
+ parallel::distributed::ContinuousQuadratureDataTransfer.
+ The implementation of CellDataStorage is flexible to support different types of
+ data object at different cells. parallel::distributed::ContinuousQuadratureDataTransfer
+ provides a convenient interface to transfer quadrature point data between cells
+ of parallel::distributed::Triangulation.
+ <br>
+ (Denis Davydov, Jean-Paul Pelteret, 2016/04/30)
+ </li>
+
+ <li> New: Added an interface to the GNU Scientific Library. Also introduce a
+ cubic spline interpolation function Functions::CSpline.
+ <br>
+ (Denis Davydov, 2016/04/28)
+ </li>
+
 
  <li> New: Added move operations to BlockIndices, BlockVectorBase and
  BlockVector; Vector move operations nullify old object instead of
@@ -216,6 +233,14 @@ inconvenience this causes.
 <h3>Specific improvements</h3>
 
 <ol>
+ <li> New: Added function GridOut::write_mesh_per_processor_as_vtu. This allows 
+ the visualization of a parallel finite element mesh that can be separated into each 
+ processor's owned and ghost cells. It also allows for the visualization of each level
+ of a multilevel mesh. 
+ <br>
+ (Conrad Clevenger, 2016/04/28)
+ </li>
+
  <li> Fixed: TrilinosWrappers::SparseMatrix will now exit early if there are no
  entries to add to the matrix. This usually occurs when zero elision is on. This
  fixes a bug where the matrix raises an exception if there are no entries to add

@@ -1,4 +1,4 @@
-# This file contains project-specific configurations for the 
+# This file contains project-specific configurations for the
 # deal.II documentation.
 
 PROJECT_NAME           = "The deal.II Library"
@@ -150,7 +150,7 @@ ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
 SEARCH_INCLUDES        = YES
-INCLUDE_PATH           = @CMAKE_SOURCE_DIR@/include/deal.II
+INCLUDE_PATH           = @CMAKE_SOURCE_DIR@/include @CMAKE_BINARY_DIR@/include
 INCLUDE_FILE_PATTERNS  =
 
 # set a few variables that help us generate documentation for
@@ -167,6 +167,7 @@ PREDEFINED             = DOXYGEN=1 \
                          DEAL_II_WITH_BOOST=1 \
                          DEAL_II_WITH_CXX11=1 \
                          DEAL_II_WITH_CXX14=1 \
+                         DEAL_II_WITH_GSL=1 \
                          DEAL_II_WITH_HDF5=1 \
                          DEAL_II_WITH_LAPACK=1 \
                          DEAL_II_WITH_METIS=1 \
@@ -188,7 +189,8 @@ PREDEFINED             = DOXYGEN=1 \
 
 
 # do not expand exception declarations
-EXPAND_AS_DEFINED      = DeclException0 \
+EXPAND_AS_DEFINED      = DeclExceptionMsg \
+                         DeclException0 \
                          DeclException1 \
                          DeclException2 \
                          DeclException3 \
