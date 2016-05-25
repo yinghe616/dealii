@@ -115,9 +115,8 @@ namespace Patterns
    * can only be realized with inclusive bounds for non-integer values. We
    * thus stay consistent by always using closed intervals.
    *
-   * If the upper bound given to the constructor is smaller than the lower
-   * bound, then the infinite interval is implied, i.e. every integer is
-   * allowed.
+   * If the upper bound given to the constructor is smaller than the
+   * lower bound, then every integer is allowed.
    *
    * Giving bounds may be useful if for example a value can only be positive
    * and less than a reasonable upper bound (for example the number of
@@ -141,10 +140,11 @@ namespace Patterns
     static const int max_int_value;
 
     /**
-     * Constructor. Bounds can be specified within which a valid parameter has
-     * to be. If the upper bound is smaller than the lower bound, then the
-     * infinite interval is meant. The default values are chosen such that no
-     * bounds are enforced on parameters.
+     * Constructor. Bounds can be specified within which a valid
+     * parameter has to be. If the upper bound is smaller than the
+     * lower bound, then the entire set of integers is implied. The
+     * default values are chosen such that no bounds are enforced on
+     * parameters.
      */
     Integer (const int lower_bound = min_int_value,
              const int upper_bound = max_int_value);
@@ -208,9 +208,8 @@ namespace Patterns
    * can only be realized with inclusive bounds for non-integer values. We
    * thus stay consistent by always using closed intervals.
    *
-   * If the upper bound given to the constructor is smaller than the lower
-   * bound, then the infinite interval is implied, i.e. every integer is
-   * allowed.
+   * If the upper bound given to the constructor is smaller than the
+   * lower bound, then every double precision number is allowed.
    *
    * Giving bounds may be useful if for example a value can only be positive
    * and less than a reasonable upper bound (for example damping parameters
@@ -221,24 +220,23 @@ namespace Patterns
   {
   public:
     /**
-     * Minimal double value. If the <tt>std::numeric_limits</tt> class is
-     * available use this information to obtain the extremal values, otherwise
-     * set it so that this class understands that all values are allowed.
+     * Minimal double value used as default value, taken from
+     * <tt>std::numeric_limits</tt>.
      */
     static const double min_double_value;
 
     /**
-     * Maximal double value. If the numeric_limits class is available use this
-     * information to obtain the extremal values, otherwise set it so that
-     * this class understands that all values are allowed.
+     * Maximal double value used as default value, taken from
+     * <tt>std::numeric_limits</tt>.
      */
     static const double max_double_value;
 
     /**
-     * Constructor. Bounds can be specified within which a valid parameter has
-     * to be. If the upper bound is smaller than the lower bound, then the
-     * infinite interval is meant. The default values are chosen such that no
-     * bounds are enforced on parameters.
+     * Constructor. Bounds can be specified within which a valid
+     * parameter has to be. If the upper bound is smaller than the
+     * lower bound, then the entire set of double precision numbers is
+     * implied. The default values are chosen such that no bounds are
+     * enforced on parameters.
      */
     Double (const double lower_bound = min_double_value,
             const double upper_bound = max_double_value);
@@ -264,9 +262,11 @@ namespace Patterns
     virtual PatternBase *clone () const;
 
     /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
+     * Creates a new object on the heap using @p new if the given
+     * @p description is a valid format (for example created by calling
+     * description() on an existing object), or NULL otherwise. Ownership of
+     * the returned object is transferred to the caller of this function,
+     * which should be freed using @p delete.
      */
     static Double *create (const std::string &description);
 
@@ -275,7 +275,7 @@ namespace Patterns
      * Value of the lower bound. A number that satisfies the
      * @ref match
      * operation of this class must be equal to this value or larger, if the
-     * bounds of the interval for a valid range.
+     * bounds of the interval form a valid range.
      */
     const double lower_bound;
 
@@ -283,7 +283,7 @@ namespace Patterns
      * Value of the upper bound. A number that satisfies the
      * @ref match
      * operation of this class must be equal to this value or less, if the
-     * bounds of the interval for a valid range.
+     * bounds of the interval form a valid range.
      */
     const double upper_bound;
 
@@ -1417,15 +1417,19 @@ namespace Patterns
  * We can think of the parameters so arranged as a file system in which every
  * parameter is a directory. The name of this directory is the name of the
  * parameter, and in this directory lie files that describe the parameter.
- * These files are: - <code>value</code>: The content of this file is the
- * current value of this parameter; initially, the content of the file equals
- * the default value of the parameter. - <code>default_value</code>: The
- * content of this file is the default value value of the parameter. -
- * <code>pattern</code>: A textual representation of the pattern that
- * describes the parameter's possible values. - <code>pattern_index</code>: A
- * number that indexes the Patterns::PatternBase object that is used to
- * describe the parameter. - <code>documentation</code>: The content of this
- * file is the documentation given for a parameter as the last argument of the
+ * These files are:
+ *
+ * - <code>value</code>: The content of this file is the current value of this
+ * parameter; initially, the content of the file equals the default value of
+ * the parameter.
+ * - <code>default_value</code>: The content of this file is the default value
+ * value of the parameter.
+ * - <code>pattern</code>: A textual representation of the pattern that
+ * describes the parameter's possible values.
+ * - <code>pattern_index</code>: A number that indexes the Patterns::PatternBase
+ * object that is used to describe the parameter.
+ * - <code>documentation</code>: The content of this file is the documentation
+ * given for a parameter as the last argument of the
  * ParameterHandler::declare_entry call. With the exception of the
  * <code>value</code> file, the contents of files are never changed after
  * declaration of a parameter.

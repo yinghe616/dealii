@@ -162,6 +162,14 @@ namespace GridTools
   double cell_measure (const std::vector<Point<dim> > &all_vertices,
                        const unsigned int (&vertex_indices)[GeometryInfo<dim>::vertices_per_cell]);
 
+  /**
+   * A version of the last function that can accept input for nonzero
+   * codimension cases. This function only exists to aid generic programming
+   * and calling it will just raise an exception.
+   */
+  template <int dim, typename T>
+  double cell_measure (const T &, ...);
+
   /*@}*/
   /**
    * @name Functions supporting the creation of meshes
@@ -1635,6 +1643,12 @@ namespace GridTools
 
 namespace GridTools
 {
+  template <int dim, typename T>
+  double cell_measure (const T &, ...)
+  {
+    Assert(false, ExcNotImplemented());
+    return std::numeric_limits<double>::quiet_NaN();
+  }
 
   template <int dim, typename Predicate, int spacedim>
   void transform (const Predicate    &predicate,
@@ -1782,18 +1796,6 @@ namespace GridTools
             }
         }
   }
-
-// declaration of explicit specializations
-
-  template <>
-  double
-  cell_measure<3>(const std::vector<Point<3> > &all_vertices,
-                  const unsigned int (&vertex_indices) [GeometryInfo<3>::vertices_per_cell]);
-
-  template <>
-  double
-  cell_measure<2>(const std::vector<Point<2> > &all_vertices,
-                  const unsigned int (&vertex_indices) [GeometryInfo<2>::vertices_per_cell]);
 }
 
 #endif

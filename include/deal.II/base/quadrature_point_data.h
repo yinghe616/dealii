@@ -16,10 +16,12 @@
 #ifndef dealii__quadrature_point_data_h
 #define dealii__quadrature_point_data_h
 
+// must include config before checking for DEAL_II_WITH_CXX11
+#include <deal.II/base/config.h>
+
 #ifdef DEAL_II_WITH_CXX11
 
 #include <deal.II/base/quadrature.h>
-#include <deal.II/base/config.h>
 #include <deal.II/base/subscriptor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -478,10 +480,10 @@ namespace parallel
 //                         TransferableQuadraturePointData
 //--------------------------------------------------------------------
 inline TransferableQuadraturePointData::TransferableQuadraturePointData()
-{};
+{}
 
 inline TransferableQuadraturePointData::~TransferableQuadraturePointData()
-{};
+{}
 
 //--------------------------------------------------------------------
 //                         CellDataStorage
@@ -490,14 +492,14 @@ inline TransferableQuadraturePointData::~TransferableQuadraturePointData()
 template <typename CellIteratorType, typename DataType>
 CellDataStorage<CellIteratorType,DataType>::
 CellDataStorage()
-{};
+{}
 
 
 
 template <typename CellIteratorType, typename DataType>
 CellDataStorage<CellIteratorType,DataType>::
 ~CellDataStorage()
-{};
+{}
 
 
 
@@ -749,7 +751,7 @@ namespace parallel
       unsigned int number_of_values = 0;
       // if triangulation has some active cells locally owned cells on this processor we can expect
       // data to be initialized. Do that to get the number:
-      for (typename parallel::distributed::Triangulation<dim>::cell_iterator it = triangulation->begin_active();
+      for (typename parallel::distributed::Triangulation<dim>::active_cell_iterator it = triangulation->begin_active();
            it != triangulation->end(); it++)
         if (it->is_locally_owned())
           {

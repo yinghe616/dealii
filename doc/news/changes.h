@@ -120,6 +120,28 @@ inconvenience this causes.
 <h3>General</h3>
 
 <ol>
+ <li> New: Add VectorTools::compute_global_error that computes global
+ errors from cellwise errors obtained by VectorTools::integrate_difference()
+ and do MPI collectives if necessary.
+ <br>
+ (Timo Heister, 2016/05/15)
+ </li>
+
+ <li> New: Add functions to transform Cartesian coordinates to spherical and back:
+ GeometricUtilities::Coordinates::to_spherical and
+ GeometricUtilities::Coordinates::from_spherical.
+ <br>
+ (Denis Davydov, 2016/05/10)
+ </li>
+
+ <li> Improved: The method Triangulation::create_triangulation will now throw an
+ exception if any cells have negative measure. This check is not run if the
+ triangulation keeps track of distorted cells or if the codimension is not zero.
+ This check was previously only run in 3D.
+ <br>
+ (David Wells, 2016/05/07)
+ </li>
+
  <li> New: Add a collection of classes to manage user's quadrature point data:
  CellDataStorage, TransferableQuadraturePointData and
  parallel::distributed::ContinuousQuadratureDataTransfer.
@@ -233,6 +255,41 @@ inconvenience this causes.
 <h3>Specific improvements</h3>
 
 <ol>
+ <li> Fixed: Fix a bug where the SparsityPattern could not have more than 4 
+ billions entries when using 32bit indices.
+ <br>
+ (Bruno Turcksin, 2016/05/22)
+  </li>
+
+ <li> New: Added PArpackSolver::reinit() when dealing with BlockVectors.
+ <br>
+ (Alberto Sartori, 2016/05/19)
+ </li>
+
+ <li> Fixed: Corrected the sign of curl calculated in the functions:
+ LocalIntegrators::curl_curl_matrix, LocalIntegrators::curl_matrix,
+ LocalIntegrators::nitsche_curl_matrix and LocalIntegrators::ip_curl_matrix in
+ integrators/maxwell.h.
+ <br>
+ (Jihuan Tian, 2016/05/09)
+ </li>
+
+ <li> Fixed: Bug in the RelaxationBlock class function do_step. Before, the 
+ corrections were not added together, which leads to a wrong update whenever the
+ Jacobi blocks are overlapping. For SOR, SSOR and non-overlapping Jacobi this was 
+ not an issue.
+ <br>
+ (Joscha Gedicke, 2016/05/07)
+ </li>
+
+ <li> Fixed: The function GridGenerator::subdivided_parallelepiped and its
+ variants could generate meshes with cells that had negative Jacobians.
+ The function now detects when this will happen and raises a descriptive
+ exception instead of going on to produce cells which may have negative measure.
+ <br>
+ (David Wells, 2016/05/11)
+ </li>
+
  <li> New: Added function GridOut::write_mesh_per_processor_as_vtu. This allows 
  the visualization of a parallel finite element mesh that can be separated into each 
  processor's owned and ghost cells. It also allows for the visualization of each level
@@ -264,7 +321,7 @@ inconvenience this causes.
  <br>
  (Martin Kronbichler, Daniel Jodlbauer, 2016/04/21)
  </li>
-
+ 
  <li> New: Added an optional string parameter to the ParameterHandler::read_input ()
  and ParameterHandler::read_input_from_string() functions.
  When a line which equals this string is encountered, the parsing of parameters

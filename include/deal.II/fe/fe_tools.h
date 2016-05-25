@@ -24,6 +24,7 @@
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/symmetric_tensor.h>
+#include <deal.II/fe/component_mask.h>
 
 #include <vector>
 #include <string>
@@ -837,6 +838,151 @@ namespace FETools
   template <int dim>
   std::vector<unsigned int>
   lexicographic_to_hierarchic_numbering (const FiniteElementData<dim> &fe_data);
+
+
+  /**
+   * Take vectors of finite elements and multiplicities and multiply out
+   * how many degrees of freedom the composed element has per vertex,
+   * line, etc.
+   *
+   * If @p do_tensor_product is true, the number of components
+   * returned in the FiniteElementData object is the sum over the
+   * product of the number of components in each of the finite
+   * elements times the corresponding multiplicity.  Otherwise the
+   * number of components is taken from the first finite element with
+   * non-zero multiplicity, and all other elements with non-zero
+   * multiplicities need to have the same number of vector components.
+   */
+  template <int dim, int spacedim>
+  FiniteElementData<dim>
+  multiply_dof_numbers (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
+                        const std::vector<unsigned int>                       &multiplicities,
+                        const bool do_tensor_product = true);
+
+  /**
+   * Same as above but for a specific number of sub-elements.
+   */
+  template <int dim, int spacedim>
+  FiniteElementData<dim>
+  multiply_dof_numbers (const FiniteElement<dim,spacedim> *fe1,
+                        const unsigned int            N1,
+                        const FiniteElement<dim,spacedim> *fe2=NULL,
+                        const unsigned int            N2=0,
+                        const FiniteElement<dim,spacedim> *fe3=NULL,
+                        const unsigned int            N3=0,
+                        const FiniteElement<dim,spacedim> *fe4=NULL,
+                        const unsigned int            N4=0,
+                        const FiniteElement<dim,spacedim> *fe5=NULL,
+                        const unsigned int            N5=0);
+
+  /**
+   * Compute the "restriction is additive" flags (see the
+   * documentation of the FiniteElement class) for a list of finite
+   * elements with multiplicities given in the second argument.
+   */
+  template <int dim, int spacedim>
+  std::vector<bool>
+  compute_restriction_is_additive_flags (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
+                                         const std::vector<unsigned int>              &multiplicities);
+
+  /**
+   * Take a @p FiniteElement object and return a boolean vector
+   * describing the @p restriction_is_additive_flags (see the
+   * documentation of the FiniteElement class) for each shape function
+   * of the mixed element consisting of @p N1, @p N2, ... copies of
+   * the sub-elements @p fe1, @p fe2, ...
+   */
+  template <int dim, int spacedim>
+  std::vector<bool>
+  compute_restriction_is_additive_flags (const FiniteElement<dim,spacedim> *fe1,
+                                         const unsigned int        N1,
+                                         const FiniteElement<dim,spacedim> *fe2=NULL,
+                                         const unsigned int        N2=0,
+                                         const FiniteElement<dim,spacedim> *fe3=NULL,
+                                         const unsigned int        N3=0,
+                                         const FiniteElement<dim,spacedim> *fe4=NULL,
+                                         const unsigned int        N4=0,
+                                         const FiniteElement<dim,spacedim> *fe5=NULL,
+                                         const unsigned int        N5=0);
+
+  /**
+   * Compute the nonzero components for each shape function of a
+   * composed finite element described by a list of finite elements
+   * with multiplicities given in the second argument.
+   *
+   * If @p do_tensor_product is true, the number of components (and
+   * thus the size of the ComponentMask objects) is the sum over the
+   * product of the number of components in each of the finite
+   * elements times the corresponding multiplicity.  Otherwise the
+   * number of components is taken from the first finite element with
+   * non-zero multiplicity, and all other elements with non-zero
+   * multiplicities need to have the same number of vector components.
+   */
+  template <int dim, int spacedim>
+  std::vector<ComponentMask>
+  compute_nonzero_components (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
+                              const std::vector<unsigned int>              &multiplicities,
+                              const bool do_tensor_product = true);
+
+  /**
+   * Compute the non-zero vector components of a composed finite
+   * element. This function is similar to the previous one, except
+   * that the pointers indicate the elements to be composed, and the
+   * arguments @p N1, @p N2, ... the multiplicities. Null pointers
+   * indicate that an argument is to be skipped.
+   */
+  template <int dim, int spacedim>
+  std::vector<ComponentMask>
+  compute_nonzero_components (const FiniteElement<dim,spacedim> *fe1,
+                              const unsigned int        N1,
+                              const FiniteElement<dim,spacedim> *fe2=NULL,
+                              const unsigned int        N2=0,
+                              const FiniteElement<dim,spacedim> *fe3=NULL,
+                              const unsigned int        N3=0,
+                              const FiniteElement<dim,spacedim> *fe4=NULL,
+                              const unsigned int        N4=0,
+                              const FiniteElement<dim,spacedim> *fe5=NULL,
+                              const unsigned int        N5=0);
+
+  /**
+   * For a given (composite) @p finite_element build @p
+   * system_to_component_table, @p system_to_base_table and @p
+   * component_to_base_table.
+   *
+   * If @p do_tensor_product is true, the number of components
+   * used for the composite element is the sum over the
+   * product of the number of components in each of the finite
+   * elements times the corresponding multiplicity.  Otherwise the
+   * number of components is taken from the first finite element with
+   * non-zero multiplicity, and all other elements with non-zero
+   * multiplicities need to have the same number of vector components.
+   */
+  template <int dim, int spacedim>
+  void
+  build_cell_tables(std::vector< std::pair< std::pair< unsigned int, unsigned int >, unsigned int > > &system_to_base_table,
+                    std::vector< std::pair< unsigned int, unsigned int > >  &system_to_component_table,
+                    std::vector< std::pair< std::pair< unsigned int, unsigned int >, unsigned int > > &component_to_base_table,
+                    const FiniteElement<dim,spacedim> &finite_element,
+                    const bool do_tensor_product = true);
+
+  /**
+   * For a given (composite) @p finite_element build @p face_system_to_base_table,
+   * and @p face_system_to_component_table.
+   *
+   * If @p do_tensor_product is true, the number of components
+   * used for the composite element is the sum over the
+   * product of the number of components in each of the finite
+   * elements times the corresponding multiplicity.  Otherwise the
+   * number of components is taken from the first finite element with
+   * non-zero multiplicity, and all other elements with non-zero
+   * multiplicities need to have the same number of vector components.
+   */
+  template <int dim, int spacedim>
+  void
+  build_face_tables(std::vector< std::pair< std::pair< unsigned int, unsigned int >, unsigned int > > &face_system_to_base_table,
+                    std::vector< std::pair< unsigned int, unsigned int > >                            &face_system_to_component_table,
+                    const FiniteElement<dim,spacedim> &finite_element,
+                    const bool do_tensor_product = true);
 
   /**
    * Parse the name of a finite element and generate a finite element object
