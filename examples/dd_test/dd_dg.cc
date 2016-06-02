@@ -204,7 +204,8 @@ private:
     void assemble_concentration_matrix ();
     double get_maximal_potential () const;
     std::pair<double,double> get_extrapolated_concentration_range () const;
-    void solve ();
+    void solve_poisson ();
+    void solve_concentration ();
     void output_results () const;
     void refine_mesh (const unsigned int max_grid_level);
 
@@ -1129,7 +1130,7 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
 // @sect4{DriftDiffusionProblem::solve}
 //
 template <int dim>
-void DriftDiffusionProblem<dim>::solve ()
+void DriftDiffusionProblem<dim>::solve_poisson ()
 {
     std::cout << "   Solving..." << std::endl;
 
@@ -1153,6 +1154,13 @@ void DriftDiffusionProblem<dim>::solve ()
                   << " GMRES iterations for Stokes subsystem."
                   << std::endl;
     }
+
+}
+
+  
+template <int dim>
+void DriftDiffusionProblem<dim>::solve_concentration ()
+{
     // Once we know the Stokes solution, we can determine the new time step
 
     old_time_step = time_step;
@@ -1355,7 +1363,8 @@ start_time_iteration:
         assemble_poisson_system ();
 //        assemble_concentration_matrix ();
 
-        solve ();
+        solve_poisson ();
+        solve_concentration ();
 //        apply_bound_preserving_limiter();
 
 
