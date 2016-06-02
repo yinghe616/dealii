@@ -198,8 +198,8 @@ private:
     void setup_dofs ();
     void setup_material_id ();
     void apply_bound_preserving_limiter ();
-    void assemble_poisson_preconditioner ();
-    void build_poisson_preconditioner ();
+//    void assemble_poisson_preconditioner ();
+  //  void build_poisson_preconditioner ();
     void assemble_poisson_system ();
     void assemble_concentration_matrix ();
     double get_maximal_potential () const;
@@ -207,21 +207,6 @@ private:
     void solve ();
     void output_results () const;
     void refine_mesh (const unsigned int max_grid_level);
-
-    double
-    compute_viscosity(const std::vector<double>          &old_concentration,
-                      const std::vector<double>          &old_old_concentration,
-                      const std::vector<Tensor<1,dim> >  &old_concentration_grads,
-                      const std::vector<Tensor<1,dim> >  &old_old_concentration_grads,
-                      const std::vector<double>          &old_concentration_laplacians,
-                      const std::vector<double>          &old_old_concentration_laplacians,
-                      const std::vector<Tensor<1,dim> >  &old_potential_values,
-                      const std::vector<Tensor<1,dim> >  &old_old_potential_values,
-                      const std::vector<double>          &gamma_values,
-                      const double                        global_u_infty,
-                      const double                        global_T_variation,
-                      const double                        cell_diameter) const;
-
 
     Triangulation<dim>                  triangulation;
     const MappingQ1<dim>                mapping;
@@ -242,12 +227,13 @@ private:
 
 
     const unsigned int                  concentration_degree;
-    FE_DGQ<dim>                         concentration_fe;
+    //FE_DGQ<dim>                         concentration_fe;
+    FE_Q<dim>                           concentration_fe;
     DoFHandler<dim>                     concentration_dof_handler;
     ConstraintMatrix                    concentration_constraints;
 
-    TrilinosWrappers::SparseMatrix      concentration_mass_matrix;
-    TrilinosWrappers::SparseMatrix      concentration_matrix;
+    SparseMatrix<double>                concentration_mass_matrix;
+    SparseMatrix<double>                concentration_matrix;
 
     SparsityPattern                     DG_sparsity_pattern;
     SparseMatrix<double>                DG_concentration_mass_matrix;
@@ -257,13 +243,12 @@ private:
     SparseMatrix<double>                DG_concentration_matrix;
     SparseMatrix<double>                DG_concentration_diff_q1_b_matrix;
     SparseMatrix<double>                DG_concentration_diff_q2_b_matrix;
-    SparseDirectUMFPACK                 inverse_mass_matrix;
 
-    TrilinosWrappers::Vector            concentration_solution;
-    TrilinosWrappers::Vector            old_concentration_solution;
-    TrilinosWrappers::Vector            old_old_concentration_solution;
-    TrilinosWrappers::Vector            old_old_old_concentration_solution;
-    TrilinosWrappers::Vector            concentration_rhs;
+    Vector<double>                      concentration_solution;
+    Vector<double>                      old_concentration_solution;
+    Vector<double>                      old_old_concentration_solution;
+    Vector<double>                      old_old_old_concentration_solution;
+    Vector<double>                      concentration_rhs;
 
     Vector<double>                      DG_concentration_solution;
     Vector<double>                      DG_old_concentration_solution;
@@ -291,12 +276,9 @@ private:
 
     double                              global_concentrational_integrals;
     double                              local_concentrational_integrals;
-    std_cxx11::shared_ptr<TrilinosWrappers::PreconditionAMG> Amg_preconditioner;
-    std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC>  Mp_preconditioner;
 
     bool                                rebuild_poisson_matrix;
     bool                                rebuild_concentration_matrices;
-    bool                                rebuild_poisson_preconditioner;
 
 //#define AMR
 
@@ -314,21 +296,21 @@ private:
 
     void integrate_cell_term_mass (DoFInfo &dinfo,
                                    CellInfo &info,
-                                   TrilinosWrappers::BlockVector &coef);
+                                   Vector<double> &coef);
     void integrate_cell_term_advection (DoFInfo &dinfo,
                                         CellInfo &info,
-                                        TrilinosWrappers::BlockVector &coef);
+                                        Vector<double> &coef);
     void integrate_cell_term_source (DoFInfo &dinfo,
                                      CellInfo &info,
-                                     TrilinosWrappers::BlockVector &coef);
+                                     Vector<double> &coef);
     void integrate_boundary_term_advection (DoFInfo &dinfo,
                                             CellInfo &info,
-                                            TrilinosWrappers::BlockVector &coef);
+                                            Vector<double> &coef);
     void integrate_face_term_advection (DoFInfo &dinfo1,
                                         DoFInfo &dinfo2,
                                         CellInfo &info1,
                                         CellInfo &info2,
-                                        TrilinosWrappers::BlockVector &coef);
+                                        Vector<double> &coef);
 };
 
 // @sect4{The local integrators}
@@ -339,7 +321,7 @@ private:
 template <int dim>
 void DriftDiffusionProblem<dim>::integrate_cell_term_advection (DoFInfo &dinfo,
         CellInfo &info,
-        TrilinosWrappers::BlockVector &coef)
+        Vector<double> &coef)
 {
     const FEValuesBase<dim> &fe_v = info.fe_values();
     FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
@@ -359,7 +341,7 @@ void DriftDiffusionProblem<dim>::integrate_cell_term_advection (DoFInfo &dinfo,
     const FEValuesExtractors::Scalar pressure (dim);
 
     std::vector<double> pressure_values (n_q_points);
-    std::vector<Tensor<1,dim> > potential_values(n_q_points);
+    std::vector<double> potential_values(n_q_points);
 
     potential_fe_values.get_function_values (coef,
             potential_values);
@@ -380,7 +362,7 @@ void DriftDiffusionProblem<dim>::integrate_cell_term_advection (DoFInfo &dinfo,
 template <int dim>
 void DriftDiffusionProblem<dim>::integrate_cell_term_source (DoFInfo &dinfo,
         CellInfo &info,
-        TrilinosWrappers::BlockVector &coef)
+        Vector<double> &coef)
 {
 }
 
@@ -388,7 +370,7 @@ void DriftDiffusionProblem<dim>::integrate_cell_term_source (DoFInfo &dinfo,
 template <int dim>
 void DriftDiffusionProblem<dim>::integrate_cell_term_mass (DoFInfo &dinfo,
         CellInfo &info,
-        TrilinosWrappers::BlockVector &coef)
+        Vector<double> &coef)
 //              double time)
 {
     // First, let us retrieve some of the objects used here from @p info. Note
@@ -438,7 +420,7 @@ void DriftDiffusionProblem<dim>::integrate_cell_term_mass (DoFInfo &dinfo,
 template <int dim>
 void DriftDiffusionProblem<dim>::integrate_boundary_term_advection (DoFInfo &dinfo,
         CellInfo &info,
-        TrilinosWrappers::BlockVector &coef)
+        Vector<double> &coef)
 {
     const FEValuesBase<dim> &fe_v = info.fe_values();
     FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
@@ -464,14 +446,13 @@ void DriftDiffusionProblem<dim>::integrate_boundary_term_advection (DoFInfo &din
 
     const FEValuesExtractors::Vector velocities (0);
 
-    std::vector<Tensor<1,dim> > potential_values(n_q_points);
-
-    potential_fe_values[velocities].get_function_values (coef,
-            potential_values);
+    std::vector<Tensor<1,dim> > potential_gradients_values(n_q_points);
+    potential_fe_values.get_function_gradients (coef,
+            potential_gradients_values);
 
     for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
     {
-        const double beta_n=potential_values[point]* normals[point];
+        const double beta_n = potential_gradients_values[point]* normals[point];
         if (beta_n>0)
             for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
                 for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
@@ -495,7 +476,7 @@ void DriftDiffusionProblem<dim>::integrate_face_term_advection (DoFInfo &dinfo1,
         DoFInfo &dinfo2,
         CellInfo &info1,
         CellInfo &info2,
-        TrilinosWrappers::BlockVector &coef)
+        Vector<double> &coef)
 {
     const FEValuesBase<dim> &fe_v = info1.fe_values();
 
@@ -525,14 +506,14 @@ void DriftDiffusionProblem<dim>::integrate_face_term_advection (DoFInfo &dinfo1,
 
     const FEValuesExtractors::Vector velocities (0);
 
-    std::vector<Tensor<1,dim> > potential_values(n_q_points);
+    std::vector<Tensor<1,dim> > potential_gradients_values(n_q_points);
 
-    potential_fe_values[velocities].get_function_values (coef,
-            potential_values);
+    potential_fe_values.get_function_gradients (coef,
+            potential_gradients_values);
 
     for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
     {
-        const double beta_n=potential_values[point] * normals[point];
+        const double beta_n=potential_gradients_values[point] * normals[point];
         if (beta_n>=0)
         {
             // This term we've already seen:
@@ -609,8 +590,7 @@ DriftDiffusionProblem<dim>::DriftDiffusionProblem ()
     global_concentrational_integrals (0),
     local_concentrational_integrals (0),
     rebuild_poisson_matrix (true),
-    rebuild_concentration_matrices (true),
-    rebuild_poisson_preconditioner (true)
+    rebuild_concentration_matrices (true)
 {
 #ifdef OUTPUT_FILE
     output_file_m.open(output_path_m.c_str());
@@ -998,25 +978,77 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
 
     const QGauss<dim> quadrature_formula (potential_degree+2);
     FEValues<dim>     potential_fe_values (potential_fe, quadrature_formula,
-                                        update_values    |
+                                        update_values       |
+                                        update_gradients    |
                                         update_quadrature_points  |
-                                        update_JxW_values |
-                                        (rebuild_poisson_matrix == true
-                                         ?
-                                         update_gradients
-                                         :
-                                         UpdateFlags(0)));
+                                        update_JxW_values);
 
     FEValues<dim> concentration_fe_values (concentration_fe, quadrature_formula,
-                                         update_values);
+                                           update_values |
+                                        update_quadrature_points  |
+                                        update_JxW_values );
     
 
-    // Next we need a vector that will contain the values of the concentration
-    MatrixCreator::create_laplace_matrix(potential_dof_handler,
-                                         QGauss<dim>(potential_fe.degree+1),
-                                         poisson_matrix);// The last two declarations are used to extract the individual blocks
+    //MatrixCreator::create_laplace_matrix(potential_dof_handler,
+      //                                   QGauss<dim>(potential_fe.degree+1),
+        //                                 poisson_matrix);
 
+    const unsigned int   dofs_per_cell = potential_fe.dofs_per_cell;
+    const unsigned int   n_q_points    = quadrature_formula.size();
 
+    FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
+    Vector<double>       cell_rhs (dofs_per_cell);
+    std::vector<double>       concentration_values(n_q_points);
+
+    std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+    
+    typename DoFHandler<dim>::active_cell_iterator
+    cell = potential_dof_handler.begin_active(),
+    endc = potential_dof_handler.end();
+
+    for (; cell!=endc; ++cell)
+    {
+      potential_fe_values.reinit (cell);
+      cell_matrix = 0;
+      cell_rhs = 0;
+      //concentration_fe_values.reinit (cell);
+      //concentration_fe_values.get_function_values(concentration_solution, concentration_values);
+      potential_fe_values.get_function_values(potential_solution, concentration_values);
+      for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
+        for (unsigned int i=0; i<dofs_per_cell; ++i)
+        {
+          for (unsigned int j=0; j<dofs_per_cell; ++j)
+                cell_matrix(i,j) += (potential_fe_values.shape_grad (i, q_index) *
+                potential_fe_values.shape_grad (j, q_index) *
+                potential_fe_values.JxW (q_index));
+
+          cell_rhs(i) += (potential_fe_values.shape_value (i, q_index) *
+         //     right_hand_side.value (potential_fe_values.quadrature_point (q_index)) *
+              concentration_values[q_index]*
+              potential_fe_values.JxW (q_index));
+        }
+      cell->get_dof_indices (local_dof_indices);
+      for (unsigned int i=0; i<dofs_per_cell; ++i)
+      {
+        for (unsigned int j=0; j<dofs_per_cell; ++j)
+          poisson_matrix.add (local_dof_indices[i],
+              local_dof_indices[j],
+              cell_matrix(i,j));
+
+        poisson_rhs(local_dof_indices[i]) += cell_rhs(i);
+      }
+    }
+  /*
+    std::map<types::global_dof_index,double> boundary_values;
+    VectorTools::interpolate_boundary_values (dof_handler,
+                                            0,
+                                            BoundaryValues<dim>(),
+                                            boundary_values);
+    MatrixTools::apply_boundary_values (boundary_values,
+                                      system_matrix,
+                                      solution,
+                                      system_rhs);
+ */
 }
 
 
@@ -1053,7 +1085,7 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
     DG_concentration_mass_matrix.reinit (DG_sparsity_pattern);
     MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double>> assembler;
     assembler.initialize(DG_concentration_mass_matrix,rhs_tmp);
-
+/*
     auto integrate_cell_term_mass_bind=std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_mass,this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
     MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
     (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
@@ -1062,10 +1094,10 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
      NULL,
      NULL,
      assembler);
-
+*/
     //DG_concentration_rhs=rhs_tmp;//if there is a source term;//FIXME
     //copy the DG mass matrix to Trillinor mass matrix
-    concentration_mass_matrix.reinit(DG_concentration_mass_matrix);
+    concentration_mass_matrix.copy_from(DG_concentration_mass_matrix);
 
     // obtain advection matrix
     DG_concentration_advec_matrix.reinit (DG_sparsity_pattern);
@@ -1080,7 +1112,7 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
             this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
     auto integrate_face_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection,
             this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->potential_solution);
-
+/*
     MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
     (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
      dof_info, info_box,
@@ -1088,8 +1120,8 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
      integrate_boundary_term_advection_bind,
      integrate_face_term_advection_bind,
      assembler1);
-
-    concentration_mass_matrix.reinit(DG_concentration_mass_matrix);
+*/
+    concentration_mass_matrix.copy_from(DG_concentration_mass_matrix);
 }
 
 
@@ -1256,79 +1288,6 @@ void DriftDiffusionProblem<dim>::output_results ()  const
 
 
 
-// @sect4{DriftDiffusionProblem::refine_mesh}
-//
-template <int dim>
-void DriftDiffusionProblem<dim>::refine_mesh (const unsigned int max_grid_level)
-{
-    Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
-    KellyErrorEstimator<dim>::estimate (concentration_dof_handler,
-                                        QGauss<dim-1>(concentration_degree+1),
-                                        typename FunctionMap<dim>::type(),
-                                        concentration_solution,
-                                        estimated_error_per_cell);
-
-#if 1
-    GridRefinement::refine_and_coarsen_fixed_fraction (triangulation,
-          estimated_error_per_cell,
-        .99, 0.01);
-#else
-    GridRefinement::refine(triangulation,
-                           estimated_error_per_cell,
-                           .1);
-
-#endif
-    if (triangulation.n_levels() > max_grid_level)
-        for (typename Triangulation<dim>::active_cell_iterator
-                cell = triangulation.begin_active(max_grid_level);
-                cell != triangulation.end(); ++cell)
-            cell->clear_refine_flag ();
-
-    //
-    // Consequently, we initialize two SolutionTransfer objects for the Stokes
-    // and concentration DoFHandler objects, by attaching them to the old dof
-    // handlers. With this at place, we can prepare the triangulation and the
-    // data vectors for refinement (in this order).
-    std::vector<TrilinosWrappers::Vector> x_concentration (3);
-    x_concentration[0] = concentration_solution;
-    x_concentration[1] = old_concentration_solution;
-    x_concentration[2] = old_old_concentration_solution;
-    TrilinosWrappers::BlockVector x_poisson = potential_solution;
-
-    SolutionTransfer<dim,TrilinosWrappers::Vector>
-    concentration_trans(concentration_dof_handler);
-    SolutionTransfer<dim,TrilinosWrappers::BlockVector>
-    poisson_trans(potential_dof_handler);
-
-    triangulation.prepare_coarsening_and_refinement();
-    concentration_trans.prepare_for_coarsening_and_refinement(x_concentration);
-    poisson_trans.prepare_for_coarsening_and_refinement(x_poisson);
-
-    // Now everything is ready, so do the refinement and recreate the dof
-    // structure on the new grid, and initialize the matrix structures and the
-    triangulation.execute_coarsening_and_refinement ();
-    setup_dofs ();
-
-    std::vector<TrilinosWrappers::Vector> tmp (3);
-    tmp[0].reinit (concentration_solution);
-    tmp[1].reinit (concentration_solution);
-    tmp[2].reinit (concentration_solution);
-    concentration_trans.interpolate(x_concentration, tmp);
-
-    concentration_solution = tmp[0];
-    old_concentration_solution = tmp[1];
-    old_old_concentration_solution = tmp[2];
-
-    DG_concentration_solution = tmp[0];
-    DG_old_concentration_solution = tmp[1];
-    DG_old_old_concentration_solution = tmp[2];
-
-    poisson_trans.interpolate (x_poisson, potential_solution);
-
-    rebuild_poisson_matrix         = true;
-    rebuild_concentration_matrices  = true;
-    rebuild_poisson_preconditioner = true;
-}
 
 
 
@@ -1337,23 +1296,17 @@ void DriftDiffusionProblem<dim>::refine_mesh (const unsigned int max_grid_level)
 template <int dim>
 void DriftDiffusionProblem<dim>::run ()
 {
-    const unsigned int initial_refinement = (dim == 2 ? 4 : 2);
-    const unsigned int n_pre_refinement_steps = (dim == 2 ? 5 : 3);
-
-
     GridGenerator::hyper_cube (triangulation,
                                0.,
                                1.);
     global_Omega_diameter = GridTools::diameter (triangulation);
-//    triangulation.refine_global (initial_refinement);
-    triangulation.refine_global (8); //if want to use global uniform mesh
+    triangulation.refine_global (5); //if want to use global uniform mesh
 
     setup_dofs();
-    setup_material_id();
-    unsigned int pre_refinement_step = 0;
+//    setup_material_id();
 
 start_time_iteration:
-
+/*
     const QIterated<dim> quadrature_formula (QTrapez<1>(),
             concentration_degree);
 
@@ -1378,21 +1331,20 @@ start_time_iteration:
         cell->get_dof_indices (local_dof_indices);
         for (unsigned int q=0; q<n_q_points; ++q)
         {
-            local_vector[q]=cell->material_id();
-            //local_vector[q]=concentration_intial.value(fe_values.quadrature_point(q),0);
+           // local_vector[q]=cell->material_id();
+            local_vector[q]=concentration_intial.value(fe_values.quadrature_point(q),0);
+            old_concentration_solution(local_dof_indices[q])=local_vector[q];
         }
-        old_concentration_solution.set(local_dof_indices,local_vector);
     }
     DG_old_concentration_solution=old_concentration_solution;
     DG_old_old_concentration_solution=old_concentration_solution;
     DG_concentration_solution=old_concentration_solution;
-
+*/
     timestep_number           = 0;
     time_step = old_time_step = 0;
 
     time =0;
     output_results ();
-#if 0
     do
     {
         std::cout << "Timestep " << timestep_number
@@ -1401,53 +1353,16 @@ start_time_iteration:
 
         // The first steps in the time loop are all obvious &ndash; we
         assemble_poisson_system ();
-        build_poisson_preconditioner ();
-        assemble_concentration_matrix ();
+//        assemble_concentration_matrix ();
 
         solve ();
-        apply_bound_preserving_limiter();
-        double min_concentration = DG_concentration_solution(0),
-               max_concentration = DG_concentration_solution(0);
-        for (unsigned int i=0; i<DG_concentration_solution.size(); ++i)
-        {
-            min_concentration = std::min<double> (min_concentration,
-                                                DG_concentration_solution(i));
-            max_concentration = std::max<double> (max_concentration,
-                                                DG_concentration_solution(i));
-        }
+//        apply_bound_preserving_limiter();
 
-        std::cout << "   Composition range1: "
-                  << min_concentration << ' ' << max_concentration
-                  << std::endl;
-
-#ifdef AMR
-        if ((timestep_number == 0) &&
-                (pre_refinement_step < n_pre_refinement_steps))
-        {
-            refine_mesh (initial_refinement + n_pre_refinement_steps);
-            apply_bound_preserving_limiter();
-            ++pre_refinement_step;
-            timestep_number=pre_refinement_step*100+1;
-            output_results ();
-            timestep_number =0;
-            goto start_time_iteration;
-        }
-        else if ((timestep_number > 0) && (timestep_number % 1 == 0))
-        {
-            refine_mesh (initial_refinement + n_pre_refinement_steps);
-            apply_bound_preserving_limiter();
-        }
-
-#endif
-
-        std::cout << "   Composition mass integral: "
-                  << global_concentrational_integrals
-                  << std::endl;
 
         time += time_step;
         ++timestep_number;
         output_results ();
-
+/*
         old_potential_solution             = potential_solution;
         old_old_old_concentration_solution = old_old_concentration_solution;
         old_old_concentration_solution    = old_concentration_solution;
@@ -1459,7 +1374,6 @@ start_time_iteration:
 
         rebuild_poisson_matrix         = true;
         rebuild_concentration_matrices  = true;
-        rebuild_poisson_preconditioner = true;
 
         min_concentration = DG_concentration_solution(0);
         max_concentration = DG_concentration_solution(0);
@@ -1474,18 +1388,15 @@ start_time_iteration:
         std::cout << "   Composition range2: "
                   << min_concentration << ' ' << max_concentration
                   << std::endl;
-        std::cout << "   Composition mass integral: "
-                  << global_concentrational_integrals
-                  << std::endl;
 #ifdef OUTPUT_FILE
         output_file_m << global_concentrational_integrals << std::endl;
         output_file_c << min_concentration << ' ' << max_concentration
                       << std::endl;
 #endif
+*/
     }
     // Do all the above until we arrive at time 100.
-    while (timestep_number <= 5001);
-#endif
+    while (timestep_number <= 1);
 }
 }
 
