@@ -220,6 +220,7 @@ private:
     SparsityPattern                     poisson_sparsity_pattern;
 
     SparseMatrix<double>                poisson_matrix;
+    SparseMatrix<double>                poisson_mass_matrix;
     SparseMatrix<double>                poisson_preconditioner_matrix;
 
     Vector<double>                      poisson_rhs;
@@ -722,11 +723,6 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
         poisson_constraints.clear ();
         DoFTools::make_hanging_node_constraints (potential_dof_handler,
                 poisson_constraints);
-        std::set<types::boundary_id> no_normal_flux_boundaries;
-        no_normal_flux_boundaries.insert (0);
-        VectorTools::compute_no_normal_flux_constraints (potential_dof_handler, 0,
-                no_normal_flux_boundaries,
-                poisson_constraints);
         poisson_constraints.close ();
     }
     
@@ -759,6 +755,7 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
     // concentration system matrices as well as the preconditioner matrix from
     {
         poisson_matrix.clear ();
+        poisson_mass_matrix.clear ();
 
         DynamicSparsityPattern dsp ( potential_dof_handler.n_dofs(),
                                      potential_dof_handler.n_dofs());
@@ -768,6 +765,7 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
 
         poisson_sparsity_pattern.copy_from(dsp);
         poisson_matrix.reinit (poisson_sparsity_pattern);
+        poisson_mass_matrix.reinit (poisson_sparsity_pattern);
     }
 
 
@@ -990,14 +988,17 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
                                         update_JxW_values );
     
 
-    //MatrixCreator::create_laplace_matrix(potential_dof_handler,
-      //                                   QGauss<dim>(potential_fe.degree+1),
-        //                                 poisson_matrix);
+    MatrixCreator::create_laplace_matrix(potential_dof_handler,
+                                         QGauss<dim>(potential_fe.degree+1),
+                                         poisson_matrix);
+    MatrixCreator::create_mass_matrix(potential_dof_handler,
+                                         QGauss<dim>(potential_fe.degree+1),
+                                         poisson_mass_matrix);
+    //poisson_matrix.add(1.0,poisson_mass_matrix);
 
     const unsigned int   dofs_per_cell = potential_fe.dofs_per_cell;
     const unsigned int   n_q_points    = quadrature_formula.size();
 
-    FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
     Vector<double>       cell_rhs (dofs_per_cell);
     std::vector<double>       concentration_values(n_q_points);
 
@@ -1009,47 +1010,36 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
 
     for (; cell!=endc; ++cell)
     {
-      potential_fe_values.reinit (cell);
-      cell_matrix = 0;
-      cell_rhs = 0;
-      //concentration_fe_values.reinit (cell);
-      //concentration_fe_values.get_function_values(concentration_solution, concentration_values);
-      potential_fe_values.get_function_values(potential_solution, concentration_values);
-      for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
-        {
-          for (unsigned int j=0; j<dofs_per_cell; ++j)
-                cell_matrix(i,j) += (potential_fe_values.shape_grad (i, q_index) *
-                potential_fe_values.shape_grad (j, q_index) *
-                potential_fe_values.JxW (q_index));
-
-          cell_rhs(i) += (potential_fe_values.shape_value (i, q_index) *
-         //     right_hand_side.value (potential_fe_values.quadrature_point (q_index)) *
-              concentration_values[q_index]*
-              potential_fe_values.JxW (q_index));
-        }
       cell->get_dof_indices (local_dof_indices);
+      potential_fe_values.reinit (cell);
+      cell_rhs = 0;
+      concentration_fe_values.reinit (cell);
+      concentration_fe_values.get_function_values(concentration_solution, concentration_values);
       for (unsigned int i=0; i<dofs_per_cell; ++i)
       {
-        for (unsigned int j=0; j<dofs_per_cell; ++j)
-          poisson_matrix.add (local_dof_indices[i],
-              local_dof_indices[j],
-              cell_matrix(i,j));
-
+        for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
+        {
+          cell_rhs(i) += (potential_fe_values.shape_value (i, q_index) *
+              //     right_hand_side.value (potential_fe_values.quadrature_point (q_index)) *
+              //concentration_values[q_index]*
+              1.0*
+              potential_fe_values.JxW (q_index));
+        }
         poisson_rhs(local_dof_indices[i]) += cell_rhs(i);
       }
+
     }
-  /*
+  
     std::map<types::global_dof_index,double> boundary_values;
-    VectorTools::interpolate_boundary_values (dof_handler,
+    VectorTools::interpolate_boundary_values (potential_dof_handler,
                                             0,
-                                            BoundaryValues<dim>(),
+                                            ZeroFunction<dim>(),
                                             boundary_values);
     MatrixTools::apply_boundary_values (boundary_values,
-                                      system_matrix,
-                                      solution,
-                                      system_rhs);
- */
+                                      poisson_matrix,
+                                      potential_solution,
+                                      poisson_rhs);
+                                      
 }
 
 
@@ -1143,7 +1133,6 @@ void DriftDiffusionProblem<dim>::solve_poisson ()
         PreconditionSSOR<> preconditioner;
         preconditioner.initialize(poisson_matrix, 1.0);
         
-        poisson_rhs*=-1.0;
         
         cg.solve(poisson_matrix, potential_solution, poisson_rhs, preconditioner);
 
@@ -1151,7 +1140,7 @@ void DriftDiffusionProblem<dim>::solve_poisson ()
 
         std::cout << "   "
                   << solver_control.last_step()
-                  << " GMRES iterations for Stokes subsystem."
+                  << " CG iterations for poisson equation."
                   << std::endl;
     }
 
@@ -1197,7 +1186,7 @@ void DriftDiffusionProblem<dim>::solve_concentration ()
                                           1e-8*DG_concentration_rhs.l2_norm());
             SolverCG<> cg (solver_control);
 
-            PreconditionBlockSSOR<SparseMatrix<double> > preconditioner;
+            PreconditionSSOR<SparseMatrix<double> > preconditioner;
             preconditioner.initialize(DG_concentration_mass_matrix, concentration_fe.dofs_per_cell);
 
             cg.solve (DG_concentration_mass_matrix, DG_concentration_solution,
@@ -1264,21 +1253,12 @@ void DriftDiffusionProblem<dim>::solve_concentration ()
 template <int dim>
 void DriftDiffusionProblem<dim>::output_results ()  const
 {
-    if (timestep_number % 20 != 0)
+    if (timestep_number % 1 != 0)
         return;
-
-    std::vector<std::string> poisson_names (dim, "potential");
-    poisson_names.push_back ("p");
-    std::vector<DataComponentInterpretation::DataComponentInterpretation>
-    poisson_component_interpretation
-    (dim+1, DataComponentInterpretation::component_is_scalar);
-    for (unsigned int i=0; i<dim; ++i)
-        poisson_component_interpretation[i]
-            = DataComponentInterpretation::component_is_part_of_vector;
 
     DataOut<dim> data_out;
     data_out.add_data_vector (potential_dof_handler, potential_solution,
-                              poisson_names, poisson_component_interpretation);
+                              "Potential");
     data_out.add_data_vector (concentration_dof_handler, concentration_solution,
                               "C");
     data_out.add_data_vector (concentration_dof_handler, DG_concentration_solution,
@@ -1352,7 +1332,6 @@ start_time_iteration:
     time_step = old_time_step = 0;
 
     time =0;
-    output_results ();
     do
     {
         std::cout << "Timestep " << timestep_number
@@ -1364,7 +1343,7 @@ start_time_iteration:
 //        assemble_concentration_matrix ();
 
         solve_poisson ();
-        solve_concentration ();
+//        solve_concentration ();
 //        apply_bound_preserving_limiter();
 
 
@@ -1405,7 +1384,7 @@ start_time_iteration:
 */
     }
     // Do all the above until we arrive at time 100.
-    while (timestep_number <= 1);
+    while (timestep_number <= 0);
 }
 }
 
