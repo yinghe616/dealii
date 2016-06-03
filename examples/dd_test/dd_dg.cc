@@ -126,7 +126,9 @@ double
 CompositionInitialValues<dim>::value (const Point<dim> &p,
                                       const unsigned int) const
 {
-    return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
+    //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
+    const double pi=3.1415926;
+    return sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
 }
 
 
@@ -196,10 +198,7 @@ public:
 
 private:
     void setup_dofs ();
-    void setup_material_id ();
     void apply_bound_preserving_limiter ();
-//    void assemble_poisson_preconditioner ();
-  //  void build_poisson_preconditioner ();
     void assemble_poisson_system ();
     void assemble_concentration_matrix ();
     double get_maximal_potential () const;
@@ -221,7 +220,6 @@ private:
 
     SparseMatrix<double>                poisson_matrix;
     SparseMatrix<double>                poisson_mass_matrix;
-    SparseMatrix<double>                poisson_preconditioner_matrix;
 
     Vector<double>                      poisson_rhs;
     Vector<double>                      potential_solution;
@@ -229,48 +227,28 @@ private:
 
 
     const unsigned int                  concentration_degree;
-    //FE_DGQ<dim>                         concentration_fe;
     FE_Q<dim>                           concentration_fe;
     DoFHandler<dim>                     concentration_dof_handler;
     ConstraintMatrix                    concentration_constraints;
+    SparsityPattern                     concentration_sparsity_pattern;
 
     SparseMatrix<double>                concentration_mass_matrix;
-    SparseMatrix<double>                concentration_matrix;
+    SparseMatrix<double>                concentration_laplace_matrix;
+    SparseMatrix<double>                concentration_matrix_1;
+    SparseMatrix<double>                concentration_matrix_2;
 
-    SparsityPattern                     DG_sparsity_pattern;
-    SparseMatrix<double>                DG_concentration_mass_matrix;
-    SparseMatrix<double>                DG_concentration_diff_x_matrix;
-    SparseMatrix<double>                DG_concentration_diff_y_matrix;
-    SparseMatrix<double>                DG_concentration_advec_matrix;
-    SparseMatrix<double>                DG_concentration_matrix;
-    SparseMatrix<double>                DG_concentration_diff_q1_b_matrix;
-    SparseMatrix<double>                DG_concentration_diff_q2_b_matrix;
 
-    Vector<double>                      concentration_solution;
-    Vector<double>                      old_concentration_solution;
-    Vector<double>                      old_old_concentration_solution;
-    Vector<double>                      old_old_old_concentration_solution;
-    Vector<double>                      concentration_rhs;
+    Vector<double>                      concentration_solution_1;
+    Vector<double>                      old_concentration_solution_1;
+    Vector<double>                      old_old_concentration_solution_1;
+    Vector<double>                      old_old_old_concentration_solution_1;
+    Vector<double>                      concentration_rhs_1;
 
-    Vector<double>                      DG_concentration_solution;
-    Vector<double>                      DG_old_concentration_solution;
-    Vector<double>                      DG_old_old_concentration_solution;
-    Vector<double>                      DG_old_old_old_concentration_solution;
-    Vector<double>                      DG_concentration_rhs;
-    
-    Vector<double>                      DG_concentration_q1_solution;
-    Vector<double>                      DG_old_concentration_q1_solution;
-    Vector<double>                      DG_old_old_concentration_q1_solution;
-    Vector<double>                      DG_old_old_old_concentration_q1_solution;
-    Vector<double>                      DG_concentration_q1_rhs;
-
-    Vector<double>                      DG_concentration_q2_solution;
-    Vector<double>                      DG_old_concentration_q2_solution;
-    Vector<double>                      DG_old_old_concentration_q2_solution;
-    Vector<double>                      DG_concentration_q2_rhs;
-
-   
-
+    Vector<double>                      concentration_solution_2;
+    Vector<double>                      old_concentration_solution_2;
+    Vector<double>                      old_old_concentration_solution_2;
+    Vector<double>                      old_old_old_concentration_solution_2;
+    Vector<double>                      concentration_rhs_2;
     double                              time;
     double                              time_step;
     double                              old_time_step;
@@ -615,8 +593,6 @@ double DriftDiffusionProblem<dim>::get_maximal_potential () const
     std::vector<double > potential_values(n_q_points);
     double max_potential = 0;
 
-    const FEValuesExtractors::Vector velocities (0);
-
     typename DoFHandler<dim>::active_cell_iterator
     cell = potential_dof_handler.begin_active(),
     endc = potential_dof_handler.end();
@@ -662,9 +638,9 @@ DriftDiffusionProblem<dim>::get_extrapolated_concentration_range () const
         for (; cell!=endc; ++cell)
         {
             fe_values.reinit (cell);
-            fe_values.get_function_values (old_concentration_solution,
+            fe_values.get_function_values (old_concentration_solution_1,
                                            old_concentration_values);
-            fe_values.get_function_values (old_old_concentration_solution,
+            fe_values.get_function_values (old_old_concentration_solution_1,
                                            old_old_concentration_values);
 
             for (unsigned int q=0; q<n_q_points; ++q)
@@ -691,7 +667,7 @@ DriftDiffusionProblem<dim>::get_extrapolated_concentration_range () const
         for (; cell!=endc; ++cell)
         {
             fe_values.reinit (cell);
-            fe_values.get_function_values (old_concentration_solution,
+            fe_values.get_function_values (old_concentration_solution_1,
                                            old_concentration_values);
 
             for (unsigned int q=0; q<n_q_points; ++q)
@@ -771,15 +747,20 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
 
     {
         concentration_mass_matrix.clear ();
-        concentration_matrix.clear ();
+        concentration_laplace_matrix.clear ();
+        concentration_matrix_1.clear ();
+        concentration_matrix_2.clear ();
 
-        CompressedSparsityPattern csp(concentration_dof_handler.n_dofs());
-        DoFTools::make_flux_sparsity_pattern (concentration_dof_handler, csp);
-        DG_sparsity_pattern.copy_from(csp);
+        DynamicSparsityPattern dsp2 ( concentration_dof_handler.n_dofs(),
+                                      concentration_dof_handler.n_dofs());
+        DoFTools::make_sparsity_pattern (concentration_dof_handler, dsp2);
+        concentration_constraints.condense(dsp2);
 
-        DG_concentration_matrix.reinit (DG_sparsity_pattern);
-        DG_concentration_mass_matrix.reinit (DG_sparsity_pattern);
-        DG_concentration_advec_matrix.reinit (DG_sparsity_pattern);
+        concentration_sparsity_pattern.copy_from(dsp2);
+        concentration_mass_matrix.reinit (concentration_sparsity_pattern);
+        concentration_laplace_matrix.reinit (concentration_sparsity_pattern);
+        concentration_matrix_1.reinit (concentration_sparsity_pattern);
+        concentration_matrix_2.reinit (concentration_sparsity_pattern);
     }
 
     // Lastly, we set the vectors for the Stokes solutions $\mathbf u^{n-1}$
@@ -790,176 +771,19 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
     old_potential_solution.reinit (potential_dof_handler.n_dofs());
     poisson_rhs.reinit (potential_dof_handler.n_dofs());
 
-    DG_concentration_solution.reinit (concentration_dof_handler.n_dofs());
-    DG_old_concentration_solution.reinit (concentration_dof_handler.n_dofs());
-    DG_old_old_concentration_solution.reinit (concentration_dof_handler.n_dofs());
-    DG_old_old_old_concentration_solution.reinit (concentration_dof_handler.n_dofs());
+    concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
+    old_concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
+    old_old_concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
+    old_old_old_concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
 
-    DG_concentration_rhs.reinit (concentration_dof_handler.n_dofs());
+    concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
+    old_concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
+    old_old_concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
+    old_old_old_concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
 
-    concentration_solution=DG_concentration_solution;
-    old_concentration_solution=DG_old_concentration_solution;
-    old_old_concentration_solution=DG_old_old_concentration_solution;
-    old_old_old_concentration_solution=DG_old_old_old_concentration_solution;
-    concentration_rhs=DG_concentration_rhs;
+    concentration_rhs_1.reinit (concentration_dof_handler.n_dofs());
+    concentration_rhs_2.reinit (concentration_dof_handler.n_dofs());
 }
-
-
-// @sect4{DriftDiffusionProblem::setup_material_id}
-//
-template <int dim>
-void DriftDiffusionProblem<dim>::setup_material_id ()
-{
-
-    typename DoFHandler<dim>::active_cell_iterator
-    cell = potential_dof_handler.begin_active(),
-    endc = potential_dof_handler.end();
-    for (; cell!=endc; ++cell)
-    {
-        const Point<dim> cell_center = cell->center();
-        if (   (cell_center(0)<=.625*1)
-                && (cell_center(0)>=.375*1)
-                && (cell_center(1)<=.875*1)
-                && (cell_center(1)>=.625*1)
-           )
-            cell->set_material_id(1);
-        else
-            cell->set_material_id(0);
-    }
-
-}
-// @sect4{DriftDiffusionProblem::apply_bound_preserving_limiter}
-//
-template <int dim>
-void DriftDiffusionProblem<dim>::apply_bound_preserving_limiter ()
-{
-
-    typename DoFHandler<dim>::active_cell_iterator
-    cell = concentration_dof_handler.begin_active(),
-    endc = concentration_dof_handler.end();
-
-    std::cout << "Stat to apply Bound Preserving Limiter "
-              << std::endl;
-    const QGauss<dim-1> quadrature_formula_x(concentration_degree+1);
-    const QGaussLobatto<dim-1> quadrature_formula_y(concentration_degree+1);
-
-    const QGauss<dim> quadrature_formula(concentration_degree+1);
-    const QAnisotropic<dim> quadrature_formula_xy(quadrature_formula_x,quadrature_formula_y);
-    const QAnisotropic<dim> quadrature_formula_yx(quadrature_formula_y,quadrature_formula_x);
-
-    const unsigned int n_q_points = quadrature_formula.size();
-    const unsigned int n_q_points_xy = quadrature_formula_xy.size();
-    const unsigned int n_q_points_yx = quadrature_formula_yx.size();
-
-    FEValues<dim>  concentration_fe_values (concentration_fe, quadrature_formula,
-                                          update_values    |
-                                          update_gradients |
-                                          update_hessians  |
-                                          update_quadrature_points  |
-                                          update_JxW_values);
-    std::vector<double>   concentration_values(n_q_points);
-
-    FEValues<dim>  concentration_fe_values_xy (concentration_fe, quadrature_formula_xy,
-            update_values    |
-            update_gradients |
-            update_hessians  |
-            update_quadrature_points  |
-            update_JxW_values);
-    std::vector<double>   concentration_values_xy (n_q_points_xy);
-
-    FEValues<dim>  concentration_fe_values_yx (concentration_fe, quadrature_formula_yx,
-            update_values    |
-            update_gradients |
-            update_hessians  |
-            update_quadrature_points  |
-            update_JxW_values);
-    std::vector<double>   concentration_values_yx (n_q_points_yx);
-
-    const unsigned int dofs_per_cell   = concentration_fe.dofs_per_cell;
-    std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
-
-    global_concentrational_integrals=0;
-    local_concentrational_integrals=0;
-    for (; cell!=endc; ++cell)
-    {
-        cell->get_dof_indices (local_dof_indices);
-        double min_concentration = DG_concentration_solution(local_dof_indices[0]),
-               max_concentration = DG_concentration_solution(local_dof_indices[0]);
-        for (unsigned int i=1; i<local_dof_indices.size(); ++i)
-        {
-            min_concentration = std::min<double> (min_concentration,
-                                                DG_concentration_solution(local_dof_indices[i]));
-            max_concentration = std::max<double> (max_concentration,
-                                                DG_concentration_solution(local_dof_indices[i]));
-        }
-        //Find the trouble cell
-        if(
-            (max_concentration>=(EquationData::Max_T+EquationData::err_tol))
-            ||
-            (min_concentration<=(EquationData::Min_T-EquationData::err_tol))
-        )
-        {
-
-            //Find the average of solution on this trouble cell
-            double T_cell_average=0;
-            double T_cell_area=0;
-
-            concentration_fe_values_xy.reinit (cell);
-            concentration_fe_values_xy.get_function_values (DG_concentration_solution,
-                    concentration_values_xy);
-            for (unsigned int q=0; q<n_q_points_xy; ++q)
-            {
-                T_cell_average+= concentration_values_xy[q]
-                                 *concentration_fe_values_xy.JxW(q);
-                T_cell_area+= 1.0
-                              *concentration_fe_values_xy.JxW(q);
-                min_concentration = std::min<double> (min_concentration,
-                                                    concentration_values_xy[q]);
-                max_concentration = std::max<double> (max_concentration,
-                                                    concentration_values_xy[q]);
-            }
-
-            // Need to divide the area of the cell
-            T_cell_average/=T_cell_area;
-
-            for (unsigned int q=0; q<n_q_points_yx; ++q)
-            {
-                min_concentration = std::min<double> (min_concentration,
-                                                    concentration_values_yx[q]);
-                max_concentration = std::max<double> (max_concentration,
-                                                    concentration_values_yx[q]);
-            }
-
-            //Define theta
-            double theta_T=std::min<double>(1,abs((EquationData::Max_T-T_cell_average)/(max_concentration-T_cell_average)));
-            theta_T=std::min<double>(theta_T,abs((EquationData::Min_T-T_cell_average)/(min_concentration-T_cell_average)));
-            //Modify the numerical solution at quadrature points
-            for (unsigned int i=0; i<local_dof_indices.size(); ++i)
-            {
-                double t_tmp=DG_concentration_solution(local_dof_indices[i]);
-                DG_concentration_solution(local_dof_indices[i])=theta_T*(t_tmp-T_cell_average)+T_cell_average;
-            }
-            /*
-            //check the cell average again
-            T_cell_average=0;
-
-            for (unsigned int q=0; q<n_q_points_xy; ++q)
-            {
-            T_cell_average+= concentration_values_xy[q]
-             *concentration_fe_values_xy.JxW(q);
-             }
-            // Need to divide the area of the cell
-            T_cell_average/=T_cell_area;
-            */
-
-        }
-    }
-        concentration_solution=DG_concentration_solution;
-}
-
-
-
-
 
 
 
@@ -1000,7 +824,8 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
     const unsigned int   n_q_points    = quadrature_formula.size();
 
     Vector<double>       cell_rhs (dofs_per_cell);
-    std::vector<double>       concentration_values(n_q_points);
+    std::vector<double>       concentration_values_1(n_q_points);
+    std::vector<double>       concentration_values_2(n_q_points);
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
     
@@ -1014,15 +839,16 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
       potential_fe_values.reinit (cell);
       cell_rhs = 0;
       concentration_fe_values.reinit (cell);
-      concentration_fe_values.get_function_values(concentration_solution, concentration_values);
+      concentration_fe_values.get_function_values(concentration_solution_1, concentration_values_1);
+      concentration_fe_values.get_function_values(concentration_solution_2, concentration_values_2);
       for (unsigned int i=0; i<dofs_per_cell; ++i)
       {
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
         {
           cell_rhs(i) += (potential_fe_values.shape_value (i, q_index) *
-              //     right_hand_side.value (potential_fe_values.quadrature_point (q_index)) *
-              //concentration_values[q_index]*
-              1.0*
+              (concentration_values_2[q_index]
+              -concentration_values_1[q_index])
+              *
               potential_fe_values.JxW (q_index));
         }
         poisson_rhs(local_dof_indices[i]) += cell_rhs(i);
@@ -1050,69 +876,111 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
 template <int dim>
 void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
 {
+    // Once we know the Stokes solution, we can determine the new time step
 
-    DG_concentration_mass_matrix = 0;
+    old_time_step = time_step;
+    const double maximal_potential = get_maximal_potential();
 
-    MeshWorker::IntegrationInfoBox<dim> info_box;
+#if 1
+    if (maximal_potential >= 0.0001)
+        time_step = 0.1*GridTools::minimal_cell_diameter(triangulation) /
+                    maximal_potential;
+    else
+        time_step = 0.1*GridTools::minimal_cell_diameter(triangulation) /
+                    .0001;
+#else
+    time_step = 2;
+#endif
+    std::cout << "   Assembling..." << std::flush;
 
-    const unsigned int n_gauss_points = concentration_dof_handler.get_fe().degree+1;
-    info_box.initialize_gauss_quadrature(n_gauss_points,
-                                         n_gauss_points,
-                                         n_gauss_points);
+    if (rebuild_concentration_matrices == true)
+    {
+      concentration_matrix_1=0;
+      concentration_matrix_2=0;
+    }
+    concentration_rhs_1=0;
+    concentration_rhs_2=0;
 
-    info_box.initialize_update_flags();
-    UpdateFlags update_flags = update_quadrature_points |
-                               update_values            |
-                               update_gradients;
-    info_box.add_update_flags(update_flags, true, true, true, true);
+    const QGauss<dim> quadrature_formula (concentration_degree+2);
+    FEValues<dim>     poisson_fe_values (potential_fe, quadrature_formula,
+                                        update_values       |
+                                        update_gradients    |
+                                        update_quadrature_points  |
+                                        update_JxW_values);
 
-    info_box.initialize(concentration_fe, mapping);
+    FEValues<dim> concentration_fe_values (concentration_fe, quadrature_formula,
+                                           update_values |
+                                        update_gradients    |
+                                        update_quadrature_points  |
+                                        update_JxW_values );
+    
 
-    Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
+    MatrixCreator::create_laplace_matrix(concentration_dof_handler,
+                                         QGauss<dim>(concentration_fe.degree+1),
+                                         concentration_laplace_matrix);
+    MatrixCreator::create_mass_matrix(concentration_dof_handler,
+                                         QGauss<dim>(concentration_fe.degree+1),
+                                         concentration_mass_matrix);
+    concentration_matrix_1.add(1.0,concentration_mass_matrix);
+    concentration_matrix_1.add(time_step,concentration_laplace_matrix);
+    concentration_matrix_2.add(1.0,concentration_mass_matrix);
+    concentration_matrix_2.add(-time_step,concentration_laplace_matrix);
 
-    MeshWorker::DoFInfo<dim> dof_info(concentration_dof_handler);
+    const unsigned int   dofs_per_cell = concentration_fe.dofs_per_cell;
+    const unsigned int   n_q_points    = quadrature_formula.size();
 
+    Vector<double>       cell_rhs_1 (dofs_per_cell);
+    Vector<double>       cell_rhs_2 (dofs_per_cell);
+    std::vector<double>       concentration_values(n_q_points);
+    std::vector< Tensor<1,dim> >       grad_poisson_values(n_q_points);
 
-    DG_concentration_mass_matrix.reinit (DG_sparsity_pattern);
-    MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double>> assembler;
-    assembler.initialize(DG_concentration_mass_matrix,rhs_tmp);
-/*
-    auto integrate_cell_term_mass_bind=std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_mass,this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
-    MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
-    (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
-     dof_info, info_box,
-     integrate_cell_term_mass_bind,
-     NULL,
-     NULL,
-     assembler);
-*/
-    //DG_concentration_rhs=rhs_tmp;//if there is a source term;//FIXME
-    //copy the DG mass matrix to Trillinor mass matrix
-    concentration_mass_matrix.copy_from(DG_concentration_mass_matrix);
+    std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+    
+    typename DoFHandler<dim>::active_cell_iterator
+    cell = concentration_dof_handler.begin_active(),
+    endc = concentration_dof_handler.end();
 
-    // obtain advection matrix
-    DG_concentration_advec_matrix.reinit (DG_sparsity_pattern);
-    rhs_tmp.reinit(concentration_dof_handler.n_dofs());
-    MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double> > assembler1;
-    assembler1.initialize(DG_concentration_advec_matrix, rhs_tmp);
+    for (; cell!=endc; ++cell)
+    {
+      cell->get_dof_indices (local_dof_indices);
+      concentration_fe_values.reinit (cell);
+      cell_rhs_1 = 0;
+      cell_rhs_2 = 0;
+      poisson_fe_values.reinit (cell);
+      poisson_fe_values.get_function_gradients(potential_solution, grad_poisson_values);
+      for (unsigned int i=0; i<dofs_per_cell; ++i)
+      {
+        for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
+        {
+          cell_rhs_1(i) += (concentration_fe_values.shape_grad (i, q_index) *
+              grad_poisson_values[q_index]*
+              1.0*time_step*
+              concentration_fe_values.JxW (q_index));
+          cell_rhs_2(i) -= (concentration_fe_values.shape_grad (i, q_index) *
+              grad_poisson_values[q_index]*
+              1.0*time_step*
+              concentration_fe_values.JxW (q_index));
+        }
+        concentration_rhs_1(local_dof_indices[i]) += cell_rhs_1(i);
+        concentration_rhs_2(local_dof_indices[i]) += cell_rhs_2(i);
+      }
 
-    //bind definitions
-    auto integrate_cell_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
-    auto integrate_boundary_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
-    auto integrate_face_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->potential_solution);
-/*
-    MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
-    (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
-     dof_info, info_box,
-     integrate_cell_term_advection_bind,
-     integrate_boundary_term_advection_bind,
-     integrate_face_term_advection_bind,
-     assembler1);
-*/
-    concentration_mass_matrix.copy_from(DG_concentration_mass_matrix);
+    }
+  
+    std::map<types::global_dof_index,double> boundary_values;
+    VectorTools::interpolate_boundary_values (concentration_dof_handler,
+                                            0,
+                                            ZeroFunction<dim>(),
+                                            boundary_values);
+    MatrixTools::apply_boundary_values (boundary_values,
+                                      concentration_matrix_1,
+                                      concentration_solution_1,
+                                      concentration_rhs_1);
+    MatrixTools::apply_boundary_values (boundary_values,
+                                      concentration_matrix_2,
+                                      concentration_solution_2,
+                                      concentration_rhs_2);
+
 }
 
 
@@ -1122,7 +990,7 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
 template <int dim>
 void DriftDiffusionProblem<dim>::solve_poisson ()
 {
-    std::cout << "   Solving..." << std::endl;
+    std::cout << "   Solving poisson..." << std::endl;
 
     {
 
@@ -1150,99 +1018,45 @@ void DriftDiffusionProblem<dim>::solve_poisson ()
 template <int dim>
 void DriftDiffusionProblem<dim>::solve_concentration ()
 {
-    // Once we know the Stokes solution, we can determine the new time step
-
-    old_time_step = time_step;
-    const double maximal_potential = get_maximal_potential();
-
-#if 1
-    if (maximal_potential >= 0.0001)
-        //time_step = 1./(1.7*dim*std::sqrt(1.*dim)) /
-        //          concentration_degree *
-        time_step = 0.05*GridTools::minimal_cell_diameter(triangulation) /
-                    maximal_potential;
-    else
-        //time_step = 1./(1.7*dim*std::sqrt(1.*dim)) /
-        //         concentration_degree *
-        time_step = 0.05*GridTools::minimal_cell_diameter(triangulation) /
-                    .0001;
-#else
-    time_step = 2;
-#endif
     std::cout << "   " << "Time step: " << time_step
               << std::endl;
 
-
-    // Next we set up the concentration system and the right hand side using the
+    std::cout << "   Solving concentration..." << std::endl;
     {
-        if (timestep_number<=1)
-        {   // SSP RK Stage 1
-            Vector<double> sol_tmp (concentration_dof_handler.n_dofs());
-            DG_concentration_advec_matrix.vmult(DG_concentration_rhs,DG_old_concentration_solution);
-            DG_concentration_rhs*=-time_step;
-            DG_concentration_mass_matrix.vmult(sol_tmp,DG_old_concentration_solution);
-            DG_concentration_rhs+=sol_tmp;
-            SolverControl solver_control (DG_concentration_mass_matrix.m(),
-                                          1e-8*DG_concentration_rhs.l2_norm());
-            SolverCG<> cg (solver_control);
 
-            PreconditionSSOR<SparseMatrix<double> > preconditioner;
-            preconditioner.initialize(DG_concentration_mass_matrix, concentration_fe.dofs_per_cell);
+        SolverControl solver_control (concentration_matrix_1.m(),
+                                      1e-6*concentration_rhs_1.l2_norm());
+        SolverCG<> cg(solver_control);
 
-            cg.solve (DG_concentration_mass_matrix, DG_concentration_solution,
-                      DG_concentration_rhs, preconditioner);
+        PreconditionSSOR<> preconditioner;
+        preconditioner.initialize(concentration_matrix_1, 1.0);
+        
+        
+        cg.solve(concentration_matrix_1, concentration_solution_1, concentration_rhs_1, preconditioner);
 
-            std::cout << "   "
-                      << solver_control.last_step()
-                      << " CG iterations 1 for concentration."
-                      << std::endl;
-            apply_bound_preserving_limiter();
-            // SSP RK Stage 2
-            DG_concentration_advec_matrix.vmult(DG_concentration_rhs,DG_concentration_solution);
-            DG_concentration_rhs*=-time_step*0.5;
-            DG_old_concentration_solution+=DG_concentration_solution;
-            DG_old_concentration_solution*=0.5;
-            DG_concentration_mass_matrix.vmult(sol_tmp,DG_old_concentration_solution);
-            DG_concentration_rhs+=sol_tmp;
+        concentration_constraints.distribute (concentration_solution_1);
 
-            preconditioner.initialize(DG_concentration_mass_matrix, concentration_fe.dofs_per_cell);
-            cg.solve (DG_concentration_mass_matrix, DG_concentration_solution,
-                      DG_concentration_rhs, preconditioner);
+        std::cout << "   "
+                  << solver_control.last_step()
+                  << " CG iterations for concentration equation."
+                  << std::endl;
 
-            std::cout << "   "
-                      << solver_control.last_step()
-                      << " CG iterations 2 for concentration."
-                      << std::endl;
-        }
-        else
-        {   // SSP 2nd multistep method
-            DG_concentration_advec_matrix.vmult(DG_concentration_rhs,DG_old_concentration_solution);
-            DG_concentration_rhs*=-time_step*1.5;
+        SolverControl solver_control_2 (concentration_matrix_2.m(),
+                                      1e-6*concentration_rhs_2.l2_norm());
+        SolverCG<> cg_2(solver_control_2);
 
-            Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
+        PreconditionSSOR<> preconditioner_2;
+        preconditioner_2.initialize(concentration_matrix_2, 1.0);
+        
+        
+        cg_2.solve(concentration_matrix_2, concentration_solution_2, concentration_rhs_2, preconditioner_2);
 
-            DG_concentration_mass_matrix.vmult(rhs_tmp,DG_old_old_old_concentration_solution);
-            rhs_tmp*=0.25;
-            DG_concentration_rhs+=rhs_tmp;
-            DG_concentration_mass_matrix.vmult(rhs_tmp,DG_old_concentration_solution);
-            rhs_tmp*=0.75;
-            DG_concentration_rhs+=rhs_tmp;
+        concentration_constraints.distribute (concentration_solution_2);
 
-            SolverControl solver_control (DG_concentration_mass_matrix.m(),
-                                          1e-8*DG_concentration_rhs.l2_norm());
-            SolverCG<> cg (solver_control);
-            PreconditionBlockSSOR<SparseMatrix<double> > preconditioner;
-            preconditioner.initialize(DG_concentration_mass_matrix, concentration_fe.dofs_per_cell);
-            cg.solve (DG_concentration_mass_matrix, DG_concentration_solution,
-                      DG_concentration_rhs, preconditioner);
-
-            std::cout << "   "
-                      << solver_control.last_step()
-                      << " CG iterations SSP stage 2 for concentration."
-                      << std::endl;
-        }
-
-        concentration_solution=DG_concentration_solution;
+        std::cout << "   "
+                  << solver_control_2.last_step()
+                  << " CG iterations for concentration equation."
+                  << std::endl;
 
     }
 }
@@ -1259,10 +1073,8 @@ void DriftDiffusionProblem<dim>::output_results ()  const
     DataOut<dim> data_out;
     data_out.add_data_vector (potential_dof_handler, potential_solution,
                               "Potential");
-    data_out.add_data_vector (concentration_dof_handler, concentration_solution,
+    data_out.add_data_vector (concentration_dof_handler, concentration_solution_1,
                               "C");
-    data_out.add_data_vector (concentration_dof_handler, DG_concentration_solution,
-                              "DG_C");
     data_out.build_patches (std::min(potential_degree, concentration_degree));
 
     std::ostringstream filename;
@@ -1291,10 +1103,9 @@ void DriftDiffusionProblem<dim>::run ()
     triangulation.refine_global (5); //if want to use global uniform mesh
 
     setup_dofs();
-//    setup_material_id();
 
 start_time_iteration:
-/*
+
     const QIterated<dim> quadrature_formula (QTrapez<1>(),
             concentration_degree);
 
@@ -1321,13 +1132,11 @@ start_time_iteration:
         {
            // local_vector[q]=cell->material_id();
             local_vector[q]=concentration_intial.value(fe_values.quadrature_point(q),0);
-            old_concentration_solution(local_dof_indices[q])=local_vector[q];
+            old_concentration_solution_1(local_dof_indices[q])=local_vector[q];
         }
     }
-    DG_old_concentration_solution=old_concentration_solution;
-    DG_old_old_concentration_solution=old_concentration_solution;
-    DG_concentration_solution=old_concentration_solution;
-*/
+    concentration_solution_1=old_concentration_solution_1;
+
     timestep_number           = 0;
     time_step = old_time_step = 0;
 
@@ -1338,53 +1147,36 @@ start_time_iteration:
                   << ":  t=" << time
                   << std::endl;
 
-        // The first steps in the time loop are all obvious &ndash; we
         assemble_poisson_system ();
-//        assemble_concentration_matrix ();
-
         solve_poisson ();
-//        solve_concentration ();
+
+        assemble_concentration_matrix ();
+        solve_concentration ();
 //        apply_bound_preserving_limiter();
 
 
         time += time_step;
         ++timestep_number;
         output_results ();
-/*
+
         old_potential_solution             = potential_solution;
-        old_old_old_concentration_solution = old_old_concentration_solution;
-        old_old_concentration_solution    = old_concentration_solution;
-        old_concentration_solution     = concentration_solution;
+        old_old_old_concentration_solution_1 = old_old_concentration_solution_1;
+        old_old_concentration_solution_1    = old_concentration_solution_1;
+        old_concentration_solution_1     = concentration_solution_1;
 
-        DG_old_old_old_concentration_solution = DG_old_old_concentration_solution;
-        DG_old_old_concentration_solution    = DG_old_concentration_solution;
-        DG_old_concentration_solution     = DG_concentration_solution;
 
-        rebuild_poisson_matrix         = true;
-        rebuild_concentration_matrices  = true;
 
-        min_concentration = DG_concentration_solution(0);
-        max_concentration = DG_concentration_solution(0);
-        for (unsigned int i=0; i<DG_concentration_solution.size(); ++i)
-        {
-            min_concentration = std::min<double> (min_concentration,
-                                                DG_concentration_solution(i));
-            max_concentration = std::max<double> (max_concentration,
-                                                DG_concentration_solution(i));
-        }
-
-        std::cout << "   Composition range2: "
-                  << min_concentration << ' ' << max_concentration
-                  << std::endl;
+        double  min_concentration=0;
+        double  max_concentration=1;
 #ifdef OUTPUT_FILE
         output_file_m << global_concentrational_integrals << std::endl;
         output_file_c << min_concentration << ' ' << max_concentration
                       << std::endl;
 #endif
-*/
+
     }
     // Do all the above until we arrive at time 100.
-    while (timestep_number <= 0);
+    while (timestep_number <= 10);
 }
 }
 
