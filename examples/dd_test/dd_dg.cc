@@ -94,24 +94,22 @@ using namespace numbers;
 
 namespace EquationData
 {
-const double eta = 1;
-const double eta_0 = 1;
-const double eta_1 = 1e+0;
-const double kappa = 0;
-const double beta = 1;
-const double density = 1;
-const double density_0 = 1.;
-const double density_1 = 1.03125;
-const double Max_T = 1;
-const double Min_T = 0;
+const double Max_C = 1;
+const double Min_C = 0;
+const double elementary_charge = 1e0;
+const double mobility_neg        = 1e0;
+const double mobility_pos        = 1e0;
+const double diffusivity_neg     = 1e0;
+const double diffusivity_pos     = 1e0;
+const double permitivity       = 1e0;
 const double err_tol = 1e-10;
 
 
 template <int dim>
-class CompositionInitialValues : public Function<dim>
+class ConcentrationNegativeInitialValues : public Function<dim>
 {
 public:
-    CompositionInitialValues () : Function<dim>(1) {}
+    ConcentrationNegativeInitialValues () : Function<dim>(1) {}
 
     virtual double value (const Point<dim>   &p,
                           const unsigned int  component = 0) const;
@@ -123,30 +121,64 @@ public:
 
 template <int dim>
 double
-CompositionInitialValues<dim>::value (const Point<dim> &p,
+ConcentrationNegativeInitialValues<dim>::value (const Point<dim> &p,
                                       const unsigned int) const
 {
     //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
     const double pi=3.1415926;
-    return sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
+    return 1+sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
+}
+
+template <int dim>
+void
+ConcentrationNegativeInitialValues<dim>::vector_value (const Point<dim> &p,
+        Vector<double>   &values) const
+{
+    for (unsigned int c=0; c<this->n_components; ++c)
+        values(c) = ConcentrationNegativeInitialValues<dim>::value (p, c);
+}
+
+template <int dim>
+class ConcentrationPositiveInitialValues : public Function<dim>
+{
+public:
+    ConcentrationPositiveInitialValues () : Function<dim>(1) {}
+
+    virtual double value (const Point<dim>   &p,
+                          const unsigned int  component = 0) const;
+
+    virtual void vector_value (const Point<dim> &p,
+                               Vector<double>   &value) const;
+};
+
+
+template <int dim>
+double
+ConcentrationPositiveInitialValues<dim>::value (const Point<dim> &p,
+                                      const unsigned int) const
+{
+    //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
+    const double pi=3.1415926;
+    return 1+cos(2.0*pi*p(1))*sin(2.0*pi*p(0));
 }
 
 
 template <int dim>
 void
-CompositionInitialValues<dim>::vector_value (const Point<dim> &p,
+ConcentrationPositiveInitialValues<dim>::vector_value (const Point<dim> &p,
         Vector<double>   &values) const
 {
     for (unsigned int c=0; c<this->n_components; ++c)
-        values(c) = CompositionInitialValues<dim>::value (p, c);
+        values(c) = ConcentrationPositiveInitialValues<dim>::value (p, c);
 }
 
 
+// define concentration negative right hand side function class
 template <int dim>
-class CompositionRightHandSide : public Function<dim>
+class ConcentrationNegativeRightHandSide : public Function<dim>
 {
 public:
-    CompositionRightHandSide () : Function<dim>(1) {}
+    ConcentrationNegativeRightHandSide () : Function<dim>(1) {}
 
     virtual double value (const Point<dim>   &p,
                           const unsigned int  component = 0) const;
@@ -158,7 +190,7 @@ public:
 
 template <int dim>
 double
-CompositionRightHandSide<dim>::value (const Point<dim>  &p,
+ConcentrationNegativeRightHandSide<dim>::value (const Point<dim>  &p,
                                       const unsigned int component) const
 {
     Assert (component == 0,
@@ -172,11 +204,11 @@ CompositionRightHandSide<dim>::value (const Point<dim>  &p,
 
 template <int dim>
 void
-CompositionRightHandSide<dim>::vector_value (const Point<dim> &p,
+ConcentrationNegativeRightHandSide<dim>::vector_value (const Point<dim> &p,
         Vector<double>   &values) const
 {
     for (unsigned int c=0; c<this->n_components; ++c)
-        values(c) = CompositionRightHandSide<dim>::value (p, c);
+        values(c) = ConcentrationNegativeRightHandSide<dim>::value (p, c);
 }
 }
 
@@ -234,21 +266,21 @@ private:
 
     SparseMatrix<double>                concentration_mass_matrix;
     SparseMatrix<double>                concentration_laplace_matrix;
-    SparseMatrix<double>                concentration_matrix_1;
-    SparseMatrix<double>                concentration_matrix_2;
+    SparseMatrix<double>                concentration_matrix_neg;
+    SparseMatrix<double>                concentration_matrix_pos;
 
 
-    Vector<double>                      concentration_solution_1;
-    Vector<double>                      old_concentration_solution_1;
-    Vector<double>                      old_old_concentration_solution_1;
-    Vector<double>                      old_old_old_concentration_solution_1;
-    Vector<double>                      concentration_rhs_1;
+    Vector<double>                      concentration_solution_neg;
+    Vector<double>                      old_concentration_solution_neg;
+    Vector<double>                      old_old_concentration_solution_neg;
+    Vector<double>                      old_old_old_concentration_solution_neg;
+    Vector<double>                      concentration_rhs_neg;
 
-    Vector<double>                      concentration_solution_2;
-    Vector<double>                      old_concentration_solution_2;
-    Vector<double>                      old_old_concentration_solution_2;
-    Vector<double>                      old_old_old_concentration_solution_2;
-    Vector<double>                      concentration_rhs_2;
+    Vector<double>                      concentration_solution_pos;
+    Vector<double>                      old_concentration_solution_pos;
+    Vector<double>                      old_old_concentration_solution_pos;
+    Vector<double>                      old_old_old_concentration_solution_pos;
+    Vector<double>                      concentration_rhs_pos;
     double                              time;
     double                              time_step;
     double                              old_time_step;
@@ -361,8 +393,8 @@ void DriftDiffusionProblem<dim>::integrate_cell_term_mass (DoFInfo &dinfo,
     Vector<double> &local_vector = dinfo.vector(0).block(0);
     const std::vector<double> &JxW = fe_v.get_JxW_values ();
     std::vector<double> g(fe_v.n_quadrature_points);
-    EquationData::CompositionRightHandSide<dim>  concentration_right_hand_side;
-    concentration_right_hand_side.value_list (fe_v.get_quadrature_points(), g);
+    EquationData::ConcentrationNegativeRightHandSide<dim>  concentration_neg_right_hand_side;
+    concentration_neg_right_hand_side.value_list (fe_v.get_quadrature_points(), g);
 
     typename DoFHandler<dim>::active_cell_iterator poisson_cell(&(dinfo.cell->get_triangulation()),
             dinfo.cell->level(),
@@ -638,9 +670,9 @@ DriftDiffusionProblem<dim>::get_extrapolated_concentration_range () const
         for (; cell!=endc; ++cell)
         {
             fe_values.reinit (cell);
-            fe_values.get_function_values (old_concentration_solution_1,
+            fe_values.get_function_values (old_concentration_solution_neg,
                                            old_concentration_values);
-            fe_values.get_function_values (old_old_concentration_solution_1,
+            fe_values.get_function_values (old_old_concentration_solution_neg,
                                            old_old_concentration_values);
 
             for (unsigned int q=0; q<n_q_points; ++q)
@@ -667,7 +699,7 @@ DriftDiffusionProblem<dim>::get_extrapolated_concentration_range () const
         for (; cell!=endc; ++cell)
         {
             fe_values.reinit (cell);
-            fe_values.get_function_values (old_concentration_solution_1,
+            fe_values.get_function_values (old_concentration_solution_neg,
                                            old_concentration_values);
 
             for (unsigned int q=0; q<n_q_points; ++q)
@@ -748,8 +780,8 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
     {
         concentration_mass_matrix.clear ();
         concentration_laplace_matrix.clear ();
-        concentration_matrix_1.clear ();
-        concentration_matrix_2.clear ();
+        concentration_matrix_neg.clear ();
+        concentration_matrix_pos.clear ();
 
         DynamicSparsityPattern dsp2 ( concentration_dof_handler.n_dofs(),
                                       concentration_dof_handler.n_dofs());
@@ -759,8 +791,8 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
         concentration_sparsity_pattern.copy_from(dsp2);
         concentration_mass_matrix.reinit (concentration_sparsity_pattern);
         concentration_laplace_matrix.reinit (concentration_sparsity_pattern);
-        concentration_matrix_1.reinit (concentration_sparsity_pattern);
-        concentration_matrix_2.reinit (concentration_sparsity_pattern);
+        concentration_matrix_neg.reinit (concentration_sparsity_pattern);
+        concentration_matrix_pos.reinit (concentration_sparsity_pattern);
     }
 
     // Lastly, we set the vectors for the Stokes solutions $\mathbf u^{n-1}$
@@ -771,18 +803,18 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
     old_potential_solution.reinit (potential_dof_handler.n_dofs());
     poisson_rhs.reinit (potential_dof_handler.n_dofs());
 
-    concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
-    old_concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
-    old_old_concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
-    old_old_old_concentration_solution_1.reinit (concentration_dof_handler.n_dofs());
+    concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
+    old_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
+    old_old_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
+    old_old_old_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
 
-    concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
-    old_concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
-    old_old_concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
-    old_old_old_concentration_solution_2.reinit (concentration_dof_handler.n_dofs());
+    concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
+    old_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
+    old_old_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
+    old_old_old_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
 
-    concentration_rhs_1.reinit (concentration_dof_handler.n_dofs());
-    concentration_rhs_2.reinit (concentration_dof_handler.n_dofs());
+    concentration_rhs_neg.reinit (concentration_dof_handler.n_dofs());
+    concentration_rhs_pos.reinit (concentration_dof_handler.n_dofs());
 }
 
 
@@ -824,8 +856,8 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
     const unsigned int   n_q_points    = quadrature_formula.size();
 
     Vector<double>       cell_rhs (dofs_per_cell);
-    std::vector<double>       concentration_values_1(n_q_points);
-    std::vector<double>       concentration_values_2(n_q_points);
+    std::vector<double>       concentration_values_neg(n_q_points);
+    std::vector<double>       concentration_values_pos(n_q_points);
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
     
@@ -839,15 +871,15 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
       potential_fe_values.reinit (cell);
       cell_rhs = 0;
       concentration_fe_values.reinit (cell);
-      concentration_fe_values.get_function_values(concentration_solution_1, concentration_values_1);
-      concentration_fe_values.get_function_values(concentration_solution_2, concentration_values_2);
+      concentration_fe_values.get_function_values(concentration_solution_neg, concentration_values_neg);
+      concentration_fe_values.get_function_values(concentration_solution_pos, concentration_values_pos);
       for (unsigned int i=0; i<dofs_per_cell; ++i)
       {
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
         {
           cell_rhs(i) += (potential_fe_values.shape_value (i, q_index) *
-              (concentration_values_2[q_index]
-              -concentration_values_1[q_index])
+              (concentration_values_pos[q_index]
+              -concentration_values_neg[q_index])
               *
               potential_fe_values.JxW (q_index));
         }
@@ -895,11 +927,11 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
 
     if (rebuild_concentration_matrices == true)
     {
-      concentration_matrix_1=0;
-      concentration_matrix_2=0;
+      concentration_matrix_neg=0;
+      concentration_matrix_pos=0;
     }
-    concentration_rhs_1=0;
-    concentration_rhs_2=0;
+    concentration_rhs_neg=0;
+    concentration_rhs_pos=0;
 
     const QGauss<dim> quadrature_formula (concentration_degree+2);
     FEValues<dim>     poisson_fe_values (potential_fe, quadrature_formula,
@@ -921,17 +953,18 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
     MatrixCreator::create_mass_matrix(concentration_dof_handler,
                                          QGauss<dim>(concentration_fe.degree+1),
                                          concentration_mass_matrix);
-    concentration_matrix_1.add(1.0,concentration_mass_matrix);
-    concentration_matrix_1.add(time_step,concentration_laplace_matrix);
-    concentration_matrix_2.add(1.0,concentration_mass_matrix);
-    concentration_matrix_2.add(-time_step,concentration_laplace_matrix);
+    concentration_matrix_neg.add(1.0,concentration_mass_matrix);
+    concentration_matrix_neg.add(time_step*EquationData::diffusivity_neg,concentration_laplace_matrix);
+    concentration_matrix_pos.add(1.0,concentration_mass_matrix);
+    concentration_matrix_pos.add(time_step*EquationData::diffusivity_pos,concentration_laplace_matrix);
 
     const unsigned int   dofs_per_cell = concentration_fe.dofs_per_cell;
     const unsigned int   n_q_points    = quadrature_formula.size();
 
-    Vector<double>       cell_rhs_1 (dofs_per_cell);
-    Vector<double>       cell_rhs_2 (dofs_per_cell);
-    std::vector<double>       concentration_values(n_q_points);
+    Vector<double>       cell_rhs_neg (dofs_per_cell);
+    Vector<double>       cell_rhs_pos (dofs_per_cell);
+    std::vector<double>       concentration_neg_values(n_q_points);
+    std::vector<double>       concentration_pos_values(n_q_points);
     std::vector< Tensor<1,dim> >       grad_poisson_values(n_q_points);
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
@@ -944,25 +977,27 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
     {
       cell->get_dof_indices (local_dof_indices);
       concentration_fe_values.reinit (cell);
-      cell_rhs_1 = 0;
-      cell_rhs_2 = 0;
+      cell_rhs_neg = 0;
+      cell_rhs_pos = 0;
       poisson_fe_values.reinit (cell);
       poisson_fe_values.get_function_gradients(potential_solution, grad_poisson_values);
+      concentration_fe_values.get_function_values(concentration_solution_neg, concentration_neg_values);
+      concentration_fe_values.get_function_values(concentration_solution_pos, concentration_pos_values);
       for (unsigned int i=0; i<dofs_per_cell; ++i)
       {
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
         {
-          cell_rhs_1(i) += (concentration_fe_values.shape_grad (i, q_index) *
+          cell_rhs_neg(i) += (concentration_fe_values.shape_grad (i, q_index) *
               grad_poisson_values[q_index]*
-              1.0*time_step*
+              1.0*time_step*concentration_neg_values[q_index]*
               concentration_fe_values.JxW (q_index));
-          cell_rhs_2(i) -= (concentration_fe_values.shape_grad (i, q_index) *
+          cell_rhs_pos(i) -= (concentration_fe_values.shape_grad (i, q_index) *
               grad_poisson_values[q_index]*
-              1.0*time_step*
+              1.0*time_step*concentration_pos_values[q_index]*
               concentration_fe_values.JxW (q_index));
         }
-        concentration_rhs_1(local_dof_indices[i]) += cell_rhs_1(i);
-        concentration_rhs_2(local_dof_indices[i]) += cell_rhs_2(i);
+        concentration_rhs_neg(local_dof_indices[i]) += cell_rhs_neg(i);
+        concentration_rhs_pos(local_dof_indices[i]) += cell_rhs_pos(i);
       }
 
     }
@@ -973,13 +1008,13 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
                                             ZeroFunction<dim>(),
                                             boundary_values);
     MatrixTools::apply_boundary_values (boundary_values,
-                                      concentration_matrix_1,
-                                      concentration_solution_1,
-                                      concentration_rhs_1);
+                                      concentration_matrix_neg,
+                                      concentration_solution_neg,
+                                      concentration_rhs_neg);
     MatrixTools::apply_boundary_values (boundary_values,
-                                      concentration_matrix_2,
-                                      concentration_solution_2,
-                                      concentration_rhs_2);
+                                      concentration_matrix_pos,
+                                      concentration_solution_pos,
+                                      concentration_rhs_pos);
 
 }
 
@@ -1024,34 +1059,34 @@ void DriftDiffusionProblem<dim>::solve_concentration ()
     std::cout << "   Solving concentration..." << std::endl;
     {
 
-        SolverControl solver_control (concentration_matrix_1.m(),
-                                      1e-6*concentration_rhs_1.l2_norm());
+        SolverControl solver_control (concentration_matrix_neg.m(),
+                                      1e-6*concentration_rhs_neg.l2_norm());
         SolverCG<> cg(solver_control);
 
         PreconditionSSOR<> preconditioner;
-        preconditioner.initialize(concentration_matrix_1, 1.0);
+        preconditioner.initialize(concentration_matrix_neg, 1.0);
         
         
-        cg.solve(concentration_matrix_1, concentration_solution_1, concentration_rhs_1, preconditioner);
+        cg.solve(concentration_matrix_neg, concentration_solution_neg, concentration_rhs_neg, preconditioner);
 
-        concentration_constraints.distribute (concentration_solution_1);
+        concentration_constraints.distribute (concentration_solution_neg);
 
         std::cout << "   "
                   << solver_control.last_step()
                   << " CG iterations for concentration equation."
                   << std::endl;
 
-        SolverControl solver_control_2 (concentration_matrix_2.m(),
-                                      1e-6*concentration_rhs_2.l2_norm());
+        SolverControl solver_control_2 (concentration_matrix_pos.m(),
+                                      1e-6*concentration_rhs_pos.l2_norm());
         SolverCG<> cg_2(solver_control_2);
 
         PreconditionSSOR<> preconditioner_2;
-        preconditioner_2.initialize(concentration_matrix_2, 1.0);
+        preconditioner_2.initialize(concentration_matrix_pos, 1.0);
         
         
-        cg_2.solve(concentration_matrix_2, concentration_solution_2, concentration_rhs_2, preconditioner_2);
+        cg_2.solve(concentration_matrix_pos, concentration_solution_pos, concentration_rhs_pos, preconditioner_2);
 
-        concentration_constraints.distribute (concentration_solution_2);
+        concentration_constraints.distribute (concentration_solution_pos);
 
         std::cout << "   "
                   << solver_control_2.last_step()
@@ -1073,8 +1108,10 @@ void DriftDiffusionProblem<dim>::output_results ()  const
     DataOut<dim> data_out;
     data_out.add_data_vector (potential_dof_handler, potential_solution,
                               "Potential");
-    data_out.add_data_vector (concentration_dof_handler, concentration_solution_1,
-                              "C");
+    data_out.add_data_vector (concentration_dof_handler, concentration_solution_neg,
+                              "Concentration_negative");
+    data_out.add_data_vector (concentration_dof_handler, concentration_solution_pos,
+                              "Concentration_positive");
     data_out.build_patches (std::min(potential_degree, concentration_degree));
 
     std::ostringstream filename;
@@ -1122,7 +1159,8 @@ start_time_iteration:
     cell = concentration_dof_handler.begin_active(),
     endc = concentration_dof_handler.end();
 
-    EquationData::CompositionInitialValues<dim> concentration_intial;
+    EquationData::ConcentrationNegativeInitialValues<dim> concentration_neg_intial;
+    EquationData::ConcentrationPositiveInitialValues<dim> concentration_pos_intial;
 
     for (; cell!=endc; ++cell)
     {
@@ -1131,16 +1169,20 @@ start_time_iteration:
         for (unsigned int q=0; q<n_q_points; ++q)
         {
            // local_vector[q]=cell->material_id();
-            local_vector[q]=concentration_intial.value(fe_values.quadrature_point(q),0);
-            old_concentration_solution_1(local_dof_indices[q])=local_vector[q];
+            local_vector[q]=concentration_neg_intial.value(fe_values.quadrature_point(q),0);
+            old_concentration_solution_neg(local_dof_indices[q])=local_vector[q];
+            local_vector[q]=concentration_pos_intial.value(fe_values.quadrature_point(q),0);
+            old_concentration_solution_pos(local_dof_indices[q])=local_vector[q];
         }
     }
-    concentration_solution_1=old_concentration_solution_1;
+    concentration_solution_neg = old_concentration_solution_neg;
+    concentration_solution_pos = old_concentration_solution_pos;
 
     timestep_number           = 0;
     time_step = old_time_step = 0;
 
     time =0;
+    output_results ();
     do
     {
         std::cout << "Timestep " << timestep_number
@@ -1160,9 +1202,12 @@ start_time_iteration:
         output_results ();
 
         old_potential_solution             = potential_solution;
-        old_old_old_concentration_solution_1 = old_old_concentration_solution_1;
-        old_old_concentration_solution_1    = old_concentration_solution_1;
-        old_concentration_solution_1     = concentration_solution_1;
+        old_old_old_concentration_solution_neg = old_old_concentration_solution_neg;
+        old_old_concentration_solution_neg    = old_concentration_solution_neg;
+        old_concentration_solution_neg     = concentration_solution_neg;
+        old_old_old_concentration_solution_pos = old_old_concentration_solution_pos;
+        old_old_concentration_solution_pos    = old_concentration_solution_pos;
+        old_concentration_solution_pos    = concentration_solution_pos;
 
 
 
