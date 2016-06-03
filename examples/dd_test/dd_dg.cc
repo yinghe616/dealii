@@ -94,127 +94,200 @@ using namespace numbers;
 
 namespace EquationData
 {
-const double Max_C = 1;
-const double Min_C = 0;
-const double elementary_charge = 1e0;
-const double mobility_neg        = 1e0;
-const double mobility_pos        = 1e0;
-const double diffusivity_neg     = 1e0;
-const double diffusivity_pos     = 1e0;
-const double permitivity       = 1e0;
-const double err_tol = 1e-10;
+  const double Max_C = 1;
+  const double Min_C = 0;
+  const double elementary_charge = 1e0;
+  const double mobility_neg        = 1e0;
+  const double mobility_pos        = 1e0;
+  const double diffusivity_neg     = 1e0;
+  const double diffusivity_pos     = 1e0;
+  const double permitivity       = 1e0;
+  const double err_tol = 1e-10;
 
 
-template <int dim>
-class ConcentrationNegativeInitialValues : public Function<dim>
-{
-public:
-    ConcentrationNegativeInitialValues () : Function<dim>(1) {}
+  template <int dim>
+    class ConcentrationNegativeInitialValues : public Function<dim>
+  {
+    public:
+      ConcentrationNegativeInitialValues () : Function<dim>(1) {}
 
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
+      virtual double value (const Point<dim>   &p,
+          const unsigned int  component = 0) const;
 
-    virtual void vector_value (const Point<dim> &p,
-                               Vector<double>   &value) const;
-};
+      virtual void vector_value (const Point<dim> &p,
+          Vector<double>   &value) const;
+  };
 
 
-template <int dim>
-double
-ConcentrationNegativeInitialValues<dim>::value (const Point<dim> &p,
-                                      const unsigned int) const
-{
-    //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
-    const double pi=3.1415926;
-    return 1+sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
-}
+  template <int dim>
+    double
+    ConcentrationNegativeInitialValues<dim>::value (const Point<dim> &p,
+        const unsigned int) const
+    {
+      //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
+      const double pi=3.1415926;
+      return 1+sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
+    }
 
-template <int dim>
-void
-ConcentrationNegativeInitialValues<dim>::vector_value (const Point<dim> &p,
+  template <int dim>
+    void
+    ConcentrationNegativeInitialValues<dim>::vector_value (const Point<dim> &p,
         Vector<double>   &values) const
-{
-    for (unsigned int c=0; c<this->n_components; ++c)
+    {
+      for (unsigned int c=0; c<this->n_components; ++c)
         values(c) = ConcentrationNegativeInitialValues<dim>::value (p, c);
-}
+    }
 
-template <int dim>
-class ConcentrationPositiveInitialValues : public Function<dim>
-{
-public:
-    ConcentrationPositiveInitialValues () : Function<dim>(1) {}
+  template <int dim>
+    class ConcentrationPositiveInitialValues : public Function<dim>
+  {
+    public:
+      ConcentrationPositiveInitialValues () : Function<dim>(1) {}
 
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
+      virtual double value (const Point<dim>   &p,
+          const unsigned int  component = 0) const;
 
-    virtual void vector_value (const Point<dim> &p,
-                               Vector<double>   &value) const;
-};
-
-
-template <int dim>
-double
-ConcentrationPositiveInitialValues<dim>::value (const Point<dim> &p,
-                                      const unsigned int) const
-{
-    //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
-    const double pi=3.1415926;
-    return 1+cos(2.0*pi*p(1))*sin(2.0*pi*p(0));
-}
+      virtual void vector_value (const Point<dim> &p,
+          Vector<double>   &value) const;
+  };
 
 
-template <int dim>
-void
-ConcentrationPositiveInitialValues<dim>::vector_value (const Point<dim> &p,
+  template <int dim>
+    double
+    ConcentrationPositiveInitialValues<dim>::value (const Point<dim> &p,
+        const unsigned int) const
+    {
+      //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
+      const double pi=3.1415926;
+      return 1+cos(2.0*pi*p(1))*sin(2.0*pi*p(0));
+    }
+
+
+  template <int dim>
+    void
+    ConcentrationPositiveInitialValues<dim>::vector_value (const Point<dim> &p,
         Vector<double>   &values) const
-{
-    for (unsigned int c=0; c<this->n_components; ++c)
+    {
+      for (unsigned int c=0; c<this->n_components; ++c)
         values(c) = ConcentrationPositiveInitialValues<dim>::value (p, c);
-}
+    }
 
 
-// define concentration negative right hand side function class
-template <int dim>
-class ConcentrationNegativeRightHandSide : public Function<dim>
-{
-public:
-    ConcentrationNegativeRightHandSide () : Function<dim>(1) {}
+  // define concentration negative right hand side function class
+  template <int dim>
+    class ConcentrationNegativeRightHandSide : public Function<dim>
+  {
+    public:
+      ConcentrationNegativeRightHandSide () : Function<dim>(1) {}
 
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
+      virtual double value (const Point<dim>   &p,
+          const unsigned int  component = 0) const;
 
-    virtual void vector_value (const Point<dim> &p,
-                               Vector<double>   &value) const;
-};
-
-
-template <int dim>
-double
-ConcentrationNegativeRightHandSide<dim>::value (const Point<dim>  &p,
-                                      const unsigned int component) const
-{
-    Assert (component == 0,
-            ExcMessage ("Invalid operation for a scalar function."));
-
-    Assert ((dim==2) || (dim==3), ExcNotImplemented());
-
-    return 0;
-}
+      virtual void vector_value (const Point<dim> &p,
+          Vector<double>   &value) const;
+  };
 
 
-template <int dim>
-void
-ConcentrationNegativeRightHandSide<dim>::vector_value (const Point<dim> &p,
+  template <int dim>
+    double
+    ConcentrationNegativeRightHandSide<dim>::value (const Point<dim>  &p,
+        const unsigned int component) const
+    {
+      Assert (component == 0,
+          ExcMessage ("Invalid operation for a scalar function."));
+
+      Assert ((dim==2) || (dim==3), ExcNotImplemented());
+
+      return 0;
+    }
+
+
+  template <int dim>
+    void
+    ConcentrationNegativeRightHandSide<dim>::vector_value (const Point<dim> &p,
         Vector<double>   &values) const
-{
-    for (unsigned int c=0; c<this->n_components; ++c)
+    {
+      for (unsigned int c=0; c<this->n_components; ++c)
         values(c) = ConcentrationNegativeRightHandSide<dim>::value (p, c);
+    }
+
+  // define concentration positive right hand side function class
+  template <int dim>
+    class ConcentrationPositiveRightHandSide : public Function<dim>
+  {
+    public:
+      ConcentrationPositiveRightHandSide () : Function<dim>(1) {}
+
+      virtual double value (const Point<dim>   &p,
+          const unsigned int  component = 0) const;
+
+      virtual void vector_value (const Point<dim> &p,
+          Vector<double>   &value) const;
+  };
+
+
+  template <int dim>
+    double
+    ConcentrationPositiveRightHandSide<dim>::value (const Point<dim>  &p,
+        const unsigned int component) const
+    {
+      Assert (component == 0,
+          ExcMessage ("Invalid operation for a scalar function."));
+
+      Assert ((dim==2) || (dim==3), ExcNotImplemented());
+
+      return 0;
+    }
+
+
+  template <int dim>
+    void
+    ConcentrationPositiveRightHandSide<dim>::vector_value (const Point<dim> &p,
+        Vector<double>   &values) const
+    {
+      for (unsigned int c=0; c<this->n_components; ++c)
+        values(c) = ConcentrationPositiveRightHandSide<dim>::value (p, c);
+    }
+  
+  // define potential right hand side function class
+  template <int dim>
+    class PotentialRightHandSide : public Function<dim>
+  {
+    public:
+      PotentialRightHandSide () : Function<dim>(1) {}
+
+      virtual double value (const Point<dim>   &p,
+          const unsigned int  component = 0) const;
+
+      virtual void vector_value (const Point<dim> &p,
+          Vector<double>   &value) const;
+  };
+
+
+  template <int dim>
+    double
+    PotentialRightHandSide<dim>::value (const Point<dim>  &p,
+        const unsigned int component) const
+    {
+      Assert (component == 0,
+          ExcMessage ("Invalid operation for a scalar function."));
+
+      Assert ((dim==2) || (dim==3), ExcNotImplemented());
+
+      return 0;
+    }
+
+
+  template <int dim>
+    void
+    PotentialRightHandSide<dim>::vector_value (const Point<dim> &p,
+        Vector<double>   &values) const
+    {
+      for (unsigned int c=0; c<this->n_components; ++c)
+        values(c) = PotentialRightHandSide<dim>::value (p, c);
+    }
+
 }
-}
-
-
-
-
 // @sect3{The <code>DriftDiffusionProblem</code> class template}
 
 // The definition of the class that defines the top-level logic of solving
