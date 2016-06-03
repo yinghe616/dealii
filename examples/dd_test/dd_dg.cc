@@ -126,7 +126,7 @@ namespace EquationData
     {
       //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
       const double pi=3.1415926;
-      return 1+sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
+      return 2-p(0)+sin(2.0*pi*p(1))*sin(2.0*pi*p(0));
     }
 
   template <int dim>
@@ -159,7 +159,7 @@ namespace EquationData
     {
       //return ((p(1)<=0.9)&& (p(1)>=0.7)&&(p(0)<=0.6)&&(p(0)>=0.4) ? 1:0);
       const double pi=3.1415926;
-      return 1+cos(2.0*pi*p(1))*sin(2.0*pi*p(0));
+      return 1+p(0)+cos(2.0*pi*p(1))*sin(2.0*pi*p(0));
     }
 
 
@@ -273,8 +273,10 @@ namespace EquationData
           ExcMessage ("Invalid operation for a scalar function."));
 
       Assert ((dim==2) || (dim==3), ExcNotImplemented());
-
-      return 0;
+      double return_value = 0;
+      if (dim ==2)
+         return_value = (p(0)*p(0)-1)*(p(1)*p(1)-1)*std::exp(p(0)*p(0)+p(1)*p(1));
+      return return_value;
     }
 
 
@@ -303,6 +305,7 @@ public:
 
 private:
     void setup_dofs ();
+    void setup_boundary_ids ();
     void apply_bound_preserving_limiter ();
     void assemble_poisson_system ();
     void assemble_concentration_matrix ();
@@ -891,9 +894,29 @@ void DriftDiffusionProblem<dim>::setup_dofs ()
 }
 
 
+// @sect4{DriftDiffusionProblem::setup_boundary_ids}
+  template <int dim>
+void DriftDiffusionProblem<dim>::setup_boundary_ids ()
+{
+  typename DoFHandler<dim>::active_cell_iterator
+    cell = potential_dof_handler.begin_active(),
+         endc = potential_dof_handler.end();
+  for (; cell!=endc; ++cell)
+    for (unsigned int face_number=0;
+        face_number<GeometryInfo<dim>::faces_per_cell;
+        ++face_number)
+      if (cell->face(face_number)->at_boundary())
+      {  
+        {
+          if (std::fabs(cell->face(face_number)->center()[0] - (-1)) < 1e-12)
+            cell->face(face_number)->set_boundary_id (1);
+          if (std::fabs(cell->face(face_number)->center()[0] - (1)) < 1e-12)
+            cell->face(face_number)->set_boundary_id (2);
+        }
+      }
+}
 
-// @sect4{DriftDiffusionProblem::assemble_poisson_system}
-//
+
 template <int dim>
 void DriftDiffusionProblem<dim>::assemble_poisson_system ()
 {
@@ -925,6 +948,8 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
                                          poisson_mass_matrix);
     //poisson_matrix.add(1.0,poisson_mass_matrix);
 
+    const EquationData::PotentialRightHandSide<dim> potential_right_hand_side;
+
     const unsigned int   dofs_per_cell = potential_fe.dofs_per_cell;
     const unsigned int   n_q_points    = quadrature_formula.size();
 
@@ -952,7 +977,8 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
         {
           cell_rhs(i) += (potential_fe_values.shape_value (i, q_index) *
               (concentration_values_pos[q_index]
-              -concentration_values_neg[q_index])
+              -concentration_values_neg[q_index]
+              +potential_right_hand_side.value(potential_fe_values.quadrature_point (q_index)))
               *
               potential_fe_values.JxW (q_index));
         }
@@ -963,8 +989,12 @@ void DriftDiffusionProblem<dim>::assemble_poisson_system ()
   
     std::map<types::global_dof_index,double> boundary_values;
     VectorTools::interpolate_boundary_values (potential_dof_handler,
-                                            0,
-                                            ZeroFunction<dim>(),
+                                            1,
+                                            ConstantFunction<dim>(.1),
+                                            boundary_values);
+    VectorTools::interpolate_boundary_values (potential_dof_handler,
+                                            2,
+                                            ConstantFunction<dim>(-.1),
                                             boundary_values);
     MatrixTools::apply_boundary_values (boundary_values,
                                       poisson_matrix,
@@ -1077,13 +1107,25 @@ void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
   
     std::map<types::global_dof_index,double> boundary_values;
     VectorTools::interpolate_boundary_values (concentration_dof_handler,
-                                            0,
-                                            ZeroFunction<dim>(),
+                                            1,
+                                            ConstantFunction<dim>(2),
+                                            boundary_values);
+    VectorTools::interpolate_boundary_values (concentration_dof_handler,
+                                            2,
+                                            ConstantFunction<dim>(0),
                                             boundary_values);
     MatrixTools::apply_boundary_values (boundary_values,
                                       concentration_matrix_neg,
                                       concentration_solution_neg,
                                       concentration_rhs_neg);
+    VectorTools::interpolate_boundary_values (concentration_dof_handler,
+                                            1,
+                                            ConstantFunction<dim>(0),
+                                            boundary_values);
+    VectorTools::interpolate_boundary_values (concentration_dof_handler,
+                                            2,
+                                            ConstantFunction<dim>(2),
+                                            boundary_values);
     MatrixTools::apply_boundary_values (boundary_values,
                                       concentration_matrix_pos,
                                       concentration_solution_pos,
@@ -1207,12 +1249,13 @@ template <int dim>
 void DriftDiffusionProblem<dim>::run ()
 {
     GridGenerator::hyper_cube (triangulation,
-                               0.,
+                               -1,
                                1.);
     global_Omega_diameter = GridTools::diameter (triangulation);
     triangulation.refine_global (5); //if want to use global uniform mesh
 
     setup_dofs();
+    setup_boundary_ids();
 
 start_time_iteration:
 
