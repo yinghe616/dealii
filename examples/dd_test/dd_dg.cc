@@ -1059,13 +1059,16 @@ namespace fem_dg
     {
       std::cout << "   Solving poisson..." << std::endl;
       {
-        //SolverControl solver_control (poisson_matrix.m(),
-          //  1e-6*poisson_rhs.l2_norm());
-        SolverControl solver_control (1000, 1e-12);
+        SolverControl solver_control (poisson_matrix.m(),
+            1e-8*poisson_rhs.l2_norm());
+      //  SolverControl solver_control (1000, 1e-12);
         SolverCG<> cg(solver_control);
+        PreconditionSSOR<> preconditioner;
+        preconditioner.initialize(poisson_matrix, 1.0);
+        
+        //potential_solution=0;
 
-        potential_solution=0;
-        cg.solve(poisson_matrix, potential_solution, poisson_rhs, PreconditionIdentity());
+        cg.solve(poisson_matrix, potential_solution, poisson_rhs, preconditioner);
 
         poisson_constraints.distribute (potential_solution);
 
@@ -1089,10 +1092,12 @@ namespace fem_dg
           //  1e-6*concentration_rhs_neg.l2_norm());
         SolverControl solver_control (1000, 1e-12);
         SolverCG<> cg(solver_control);
+        PreconditionSSOR<> preconditioner_neg;
+        preconditioner_neg.initialize(concentration_matrix_neg, 1.0);
 
         concentration_solution_neg=0;
         cg.solve(concentration_matrix_neg, concentration_solution_neg, concentration_rhs_neg,
-           PreconditionIdentity());
+           preconditioner_neg);
 
         concentration_constraints.distribute (concentration_solution_neg);
 
@@ -1104,11 +1109,13 @@ namespace fem_dg
         //SolverControl solver_control_2 (concentration_matrix_pos.m(),
           //  1e-6*concentration_rhs_pos.l2_norm());
         SolverControl solver_control_2 (1000, 1e-12);
-
         SolverCG<> cg_2(solver_control_2);
+        PreconditionSSOR<> preconditioner_pos;
+        preconditioner_pos.initialize(concentration_matrix_pos, 1.0);
+
         concentration_solution_pos=0;
         cg_2.solve(concentration_matrix_pos, concentration_solution_pos, concentration_rhs_pos, 
-            PreconditionIdentity());
+            preconditioner_pos);
 
         concentration_constraints.distribute (concentration_solution_pos);
 
