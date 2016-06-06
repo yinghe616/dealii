@@ -438,7 +438,7 @@ namespace fem_dg
         bool                                rebuild_poisson_matrix;
         bool                                rebuild_concentration_matrices;
 
-        //#define AMR
+#define AMR
 
 #define OUTPUT_FILE
 #ifdef OUTPUT_FILE
@@ -866,7 +866,7 @@ namespace fem_dg
       time_step = 1*h_min*h_min;///maximal_potential;
       std::cout << "Time step " << time_step << std::endl;
 #else
-      time_step = 0.001;
+      time_step = 0.0001;
 #endif
 
 
@@ -1125,7 +1125,7 @@ namespace fem_dg
   template <int dim>
     void DriftDiffusionProblem<dim>::output_results ()  const
     {
-      if (timestep_number % 500 != 0)
+      if (timestep_number % 1 != 0)
         return;
 
       DataOut<dim> data_out;
@@ -1153,6 +1153,125 @@ namespace fem_dg
     }
 
 
+  // @sect4{DriftDiffusionProblem::refine_mesh}
+  //
+  template <int dim>
+    void DriftDiffusionProblem<dim>::refine_mesh (const unsigned int max_grid_level)
+    {
+      Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
+      estimated_error_per_cell =0;
+      Vector<double> tmp_diff;
+      tmp_diff  = concentration_solution_pos;
+      tmp_diff -= concentration_solution_neg;
+   /*
+    KellyErrorEstimator<dim>::estimate (concentration_dof_handler,
+          QGauss<dim-1>(concentration_degree+1),
+          typename FunctionMap<dim>::type(),
+          concentration_solution_neg,
+          estimated_error_per_cell);
+
+      estimated_error_per_cell +=estimated_error_per_cell_2;
+      Vector<float> estimated_error_per_cell_3 (triangulation.n_active_cells());
+      KellyErrorEstimator<dim>::estimate (potential_dof_handler,
+          QGauss<dim-1>(potential_degree+1),
+          typename FunctionMap<dim>::type(),
+          potential_solution,
+          estimated_error_per_cell_3);
+    */  
+      Vector<float> estimated_error_per_cell_2 (triangulation.n_active_cells());
+      KellyErrorEstimator<dim>::estimate (concentration_dof_handler,
+          QGauss<dim-1>(concentration_degree+1),
+          typename FunctionMap<dim>::type(),
+          //concentration_solution_pos,
+          tmp_diff,
+          estimated_error_per_cell_2);
+      estimated_error_per_cell +=estimated_error_per_cell_2;
+#if 1
+      GridRefinement::refine_and_coarsen_fixed_fraction (triangulation,
+          estimated_error_per_cell,
+          .3, 0.00);
+#else
+      GridRefinement::refine(triangulation,
+          estimated_error_per_cell,
+          .6);
+
+#endif
+      if (triangulation.n_levels() > max_grid_level)
+        for (typename Triangulation<dim>::active_cell_iterator
+            cell = triangulation.begin_active(max_grid_level);
+            cell != triangulation.end(); ++cell)
+          cell->clear_refine_flag ();
+
+      //
+      // Consequently, we initialize two SolutionTransfer objects for the Stokes
+      // and concentration DoFHandler objects, by attaching them to the old dof
+      // handlers. With this at place, we can prepare the triangulation and the
+      // data vectors for refinement (in this order).
+      std::vector<Vector<double>> x_concentration (8);
+      x_concentration[0] = concentration_solution_neg;
+      x_concentration[1] = exact_concentration_solution_neg;
+      x_concentration[2] = old_concentration_solution_neg;
+      x_concentration[3] = old_old_concentration_solution_neg;
+      x_concentration[4] = concentration_solution_pos;
+      x_concentration[5] = exact_concentration_solution_pos;
+      x_concentration[6] = old_concentration_solution_pos;
+      x_concentration[7] = old_old_concentration_solution_pos;
+      std::vector<Vector<double>> x_potential (2);
+      x_potential[0] = potential_solution;
+      x_potential[1] = exact_potential_solution;
+
+      SolutionTransfer<dim,Vector<double>>
+        concentration_trans(concentration_dof_handler);
+      SolutionTransfer<dim,Vector<double>>
+        poisson_trans(potential_dof_handler);
+
+      triangulation.prepare_coarsening_and_refinement();
+      concentration_trans.prepare_for_coarsening_and_refinement(x_concentration);
+      poisson_trans.prepare_for_coarsening_and_refinement(x_potential);
+
+      // Now everything is ready, so do the refinement and recreate the dof
+      // structure on the new grid, and initialize the matrix structures and the
+      triangulation.execute_coarsening_and_refinement ();
+      setup_dofs ();
+      setup_boundary_ids();
+
+      std::vector<Vector<double>> tmp (8);
+      tmp[0].reinit (concentration_solution_neg);
+      tmp[1].reinit (concentration_solution_neg);
+      tmp[2].reinit (concentration_solution_neg);
+      tmp[3].reinit (concentration_solution_neg);
+      tmp[4].reinit (concentration_solution_neg);
+      tmp[5].reinit (concentration_solution_neg);
+      tmp[6].reinit (concentration_solution_neg);
+      tmp[7].reinit (concentration_solution_neg);
+      concentration_trans.interpolate(x_concentration, tmp);
+
+      concentration_solution_neg         = tmp[0];
+      exact_concentration_solution_neg   = tmp[1];
+      old_concentration_solution_neg     = tmp[2];
+      old_old_concentration_solution_neg = tmp[3];
+      concentration_solution_pos         = tmp[4];
+      exact_concentration_solution_pos   = tmp[5];
+      old_concentration_solution_pos     = tmp[6];
+      old_old_concentration_solution_pos = tmp[7];
+
+      concentration_constraints.distribute (concentration_solution_neg);
+      concentration_constraints.distribute (exact_concentration_solution_neg);
+      concentration_constraints.distribute (concentration_solution_pos);
+      concentration_constraints.distribute (exact_concentration_solution_pos);
+
+      std::vector<Vector<double>> tmp2 (2);
+      tmp2[0].reinit (potential_solution);
+      tmp2[1].reinit (potential_solution);
+      poisson_trans.interpolate (x_potential, tmp2);
+      potential_solution         = tmp2[0];
+      exact_potential_solution   = tmp2[1];
+      poisson_constraints.distribute (potential_solution);
+      poisson_constraints.distribute (exact_potential_solution);
+
+      rebuild_poisson_matrix          = true;
+      rebuild_concentration_matrices  = true;
+    }
 
 
 
@@ -1162,14 +1281,19 @@ namespace fem_dg
   template <int dim>
     void DriftDiffusionProblem<dim>::run ()
     {
+      const unsigned int initial_refinement = (dim == 2 ? 4 : 2);
+      const unsigned int n_pre_refinement_steps = (dim == 2 ? 2 : 3);
+
       GridGenerator::hyper_rectangle(triangulation,
           Point<dim>  (-1,-1),
           Point<dim>  ( 1, 1));
       global_Omega_diameter = GridTools::diameter (triangulation);
-      triangulation.refine_global (5); //if want to use global uniform mesh
+  //    triangulation.refine_global (5); //if want to use global uniform mesh
+      triangulation.refine_global (initial_refinement);
 
       setup_dofs();
       setup_boundary_ids();
+      unsigned int pre_refinement_step = 0;
 
 start_time_iteration:
 
@@ -1216,6 +1340,29 @@ start_time_iteration:
         assemble_concentration_matrix ();
         solve_concentration ();
         //        apply_bound_preserving_limiter();
+        //
+        // adaptive mesh refinement
+#ifdef AMR
+        if ((timestep_number == 0) &&
+                (pre_refinement_step < n_pre_refinement_steps))
+        {
+            refine_mesh (initial_refinement + n_pre_refinement_steps);
+          //  apply_bound_preserving_limiter();
+            ++pre_refinement_step;
+            timestep_number=pre_refinement_step*100+1;
+            output_results ();
+            timestep_number =0;
+            goto start_time_iteration;
+        }
+        else if ((timestep_number > 0) && (timestep_number % 1 == 0))
+        {
+            refine_mesh (initial_refinement + n_pre_refinement_steps);
+            //apply_bound_preserving_limiter();
+        }
+
+#endif
+
+        //
         time += time_step;
         ++timestep_number;
         output_results ();
