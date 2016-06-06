@@ -500,8 +500,12 @@ namespace fem_dg
           potential_degree+1);
       const unsigned int n_q_points = quadrature_formula.size();
 
-      FEValues<dim> fe_values (potential_fe, quadrature_formula, update_values);
+      FEValues<dim> fe_values (potential_fe, quadrature_formula, 
+          update_values|
+          update_gradients
+          );
       std::vector<double > potential_values(n_q_points);
+      std::vector<Tensor<1,dim> > potential_grad(n_q_points);
       double max_potential = 0;
 
       typename DoFHandler<dim>::active_cell_iterator
@@ -510,11 +514,14 @@ namespace fem_dg
       for (; cell!=endc; ++cell)
       {
         fe_values.reinit (cell);
-        fe_values.get_function_values (potential_solution,
-            potential_values);
+        fe_values.get_function_gradients (potential_solution,
+            potential_grad);
 
         for (unsigned int q=0; q<n_q_points; ++q)
-          max_potential = std::max (max_potential, std::abs(potential_values[q]));
+        {
+          max_potential = std::max (max_potential, potential_grad[q][0]);
+          max_potential = std::max (max_potential, potential_grad[q][1]);
+        }
       }
 
       return max_potential;
@@ -853,12 +860,11 @@ namespace fem_dg
       const double maximal_potential = get_maximal_potential();
 
 #if 0
-      if (maximal_potential >= 0.0001)
-        time_step = 0.1*GridTools::minimal_cell_diameter(triangulation) /
-          maximal_potential;
-      else
-        time_step = 0.1*GridTools::minimal_cell_diameter(triangulation) /
-          .0001;
+      std::cout << "max eletric field " << maximal_potential << std::endl;
+      double h_min=GridTools::minimal_cell_diameter(triangulation);
+      std::cout << "min cell diameter " << h_min << std::endl;
+      time_step = 1*h_min*h_min;///maximal_potential;
+      std::cout << "Time step " << time_step << std::endl;
 #else
       time_step = 0.001;
 #endif
