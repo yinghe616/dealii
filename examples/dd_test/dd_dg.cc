@@ -403,7 +403,7 @@ namespace fem_dg
 
 
         const unsigned int                  concentration_degree;
-        FE_Q<dim>                           concentration_fe;
+        FE_DGQ<dim>                         concentration_fe;
         DoFHandler<dim>                     concentration_dof_handler;
         ConstraintMatrix                    concentration_constraints;
         SparsityPattern                     concentration_sparsity_pattern;
@@ -438,7 +438,7 @@ namespace fem_dg
         bool                                rebuild_poisson_matrix;
         bool                                rebuild_concentration_matrices;
 
-#define AMR
+//#define AMR
 
 #define OUTPUT_FILE
 #ifdef OUTPUT_FILE
@@ -616,11 +616,11 @@ namespace fem_dg
 
       {
         concentration_dof_handler.distribute_dofs (concentration_fe);
-
-        concentration_constraints.clear ();
-        DoFTools::make_hanging_node_constraints (concentration_dof_handler,
-            concentration_constraints);
-        concentration_constraints.close ();
+// DG dones't need constrains matrix
+//        concentration_constraints.clear ();
+//        DoFTools::make_hanging_node_constraints (concentration_dof_handler,
+//            concentration_constraints);
+//        concentration_constraints.close ();
       }
 
 
@@ -663,10 +663,9 @@ namespace fem_dg
         concentration_matrix_neg.clear ();
         concentration_matrix_pos.clear ();
 
-        DynamicSparsityPattern dsp2 ( concentration_dof_handler.n_dofs(),
+        CompressedSparsityPattern dsp2 ( concentration_dof_handler.n_dofs(),
             concentration_dof_handler.n_dofs());
-        DoFTools::make_sparsity_pattern (concentration_dof_handler, dsp2);
-        concentration_constraints.condense(dsp2);
+        DoFTools::make_flux_sparsity_pattern (concentration_dof_handler, dsp2);
 
         concentration_sparsity_pattern.copy_from(dsp2);
         concentration_mass_matrix.reinit (concentration_sparsity_pattern);
@@ -794,15 +793,18 @@ namespace fem_dg
       typename DoFHandler<dim>::active_cell_iterator
         cell = potential_dof_handler.begin_active(),
              endc = potential_dof_handler.end();
+      typename DoFHandler<dim>::active_cell_iterator
+        cell2 = concentration_dof_handler.begin_active(),
+             endc2 = concentration_dof_handler.end();
       poisson_rhs = 0;
       EquationData::PotentialRightHandSide<dim> potential_right_hand_side;
       potential_right_hand_side.set_time(time);
-      for (; cell!=endc; ++cell)
+      for (; cell!=endc, cell2!=endc2; ++cell,++cell2)
       {
         cell->get_dof_indices (local_dof_indices);
         potential_fe_values.reinit (cell);
         cell_rhs = 0;
-        concentration_fe_values.reinit (cell);
+        concentration_fe_values.reinit (cell2);
         concentration_fe_values.get_function_values(exact_concentration_solution_neg, concentration_values_neg);
         concentration_fe_values.get_function_values(exact_concentration_solution_pos, concentration_values_pos);
         for (unsigned int i=0; i<dofs_per_cell; ++i)
@@ -904,6 +906,9 @@ namespace fem_dg
       typename DoFHandler<dim>::active_cell_iterator
         cell = concentration_dof_handler.begin_active(),
              endc = concentration_dof_handler.end();
+      typename DoFHandler<dim>::active_cell_iterator
+        cell2 = potential_dof_handler.begin_active(),
+             endc2 = potential_dof_handler.end();
 
       if (rebuild_concentration_matrices)
       {
@@ -952,16 +957,17 @@ namespace fem_dg
       }
 
       cell = concentration_dof_handler.begin_active();
+      cell2 = potential_dof_handler.begin_active();
       EquationData::ConcentrationNegativeRightHandSide<dim> concentration_neg_right_hand_side;
       EquationData::ConcentrationPositiveRightHandSide<dim> concentration_pos_right_hand_side;
       concentration_neg_right_hand_side.set_time(time);
       concentration_pos_right_hand_side.set_time(time);
 
-      for (; cell!=endc; ++cell)
+      for (; cell!=endc, cell2!=endc2; ++cell, ++cell2)
       {
         cell->get_dof_indices (local_dof_indices);
         concentration_fe_values.reinit (cell);
-        poisson_fe_values.reinit (cell);
+        poisson_fe_values.reinit (cell2);
         poisson_fe_values.get_function_gradients(potential_solution, grad_poisson_values);
         concentration_fe_values.get_function_values(exact_concentration_solution_neg, concentration_neg_values);
         concentration_fe_values.get_function_values(exact_concentration_solution_pos, concentration_pos_values);
@@ -1004,8 +1010,9 @@ namespace fem_dg
           concentration_rhs_pos(local_dof_indices[i]) += cell_rhs_pos(i);
         }
       }
-      concentration_constraints.condense (concentration_matrix_neg, concentration_rhs_neg); 
-      concentration_constraints.condense (concentration_matrix_pos, concentration_rhs_pos); 
+      // DG elements dont need to apply the constraints
+//      concentration_constraints.condense (concentration_matrix_neg, concentration_rhs_neg); 
+//      concentration_constraints.condense (concentration_matrix_pos, concentration_rhs_pos); 
 /*
 
       EquationData::ExactSolution_concentration_neg<dim> exact_concentration_neg;
@@ -1099,7 +1106,7 @@ namespace fem_dg
         cg.solve(concentration_matrix_neg, concentration_solution_neg, concentration_rhs_neg,
            preconditioner_neg);
 
-        concentration_constraints.distribute (concentration_solution_neg);
+       // concentration_constraints.distribute (concentration_solution_neg);
 
         std::cout << "   "
           << solver_control.last_step()
@@ -1117,7 +1124,7 @@ namespace fem_dg
         cg_2.solve(concentration_matrix_pos, concentration_solution_pos, concentration_rhs_pos, 
             preconditioner_pos);
 
-        concentration_constraints.distribute (concentration_solution_pos);
+        //concentration_constraints.distribute (concentration_solution_pos);
 
         std::cout << "   "
           << solver_control_2.last_step()
@@ -1261,11 +1268,11 @@ namespace fem_dg
       exact_concentration_solution_pos   = tmp[5];
       old_concentration_solution_pos     = tmp[6];
       old_old_concentration_solution_pos = tmp[7];
-
-      concentration_constraints.distribute (concentration_solution_neg);
-      concentration_constraints.distribute (exact_concentration_solution_neg);
-      concentration_constraints.distribute (concentration_solution_pos);
-      concentration_constraints.distribute (exact_concentration_solution_pos);
+// dg don't need to consider hanging nodes constrains
+//      concentration_constraints.distribute (concentration_solution_neg);
+//      concentration_constraints.distribute (exact_concentration_solution_neg);
+//      concentration_constraints.distribute (concentration_solution_pos);
+//      concentration_constraints.distribute (exact_concentration_solution_pos);
 
       std::vector<Vector<double>> tmp2 (2);
       tmp2[0].reinit (potential_solution);
@@ -1295,8 +1302,8 @@ namespace fem_dg
           Point<dim>  (-1,-1),
           Point<dim>  ( 1, 1));
       global_Omega_diameter = GridTools::diameter (triangulation);
-  //    triangulation.refine_global (5); //if want to use global uniform mesh
-      triangulation.refine_global (initial_refinement);
+      triangulation.refine_global (5); //if want to use global uniform mesh
+  //    triangulation.refine_global (initial_refinement);
 
       setup_dofs();
       setup_boundary_ids();
@@ -1319,21 +1326,21 @@ start_time_iteration:
         VectorTools::interpolate (potential_dof_handler,
             exact_potential,
             exact_potential_solution);
-        concentration_constraints.distribute (exact_potential_solution);
+        poisson_constraints.distribute (exact_potential_solution);
         
         EquationData::ExactSolution_concentration_neg<dim> exact_concentration_neg;
         exact_concentration_neg.set_time(time);
         VectorTools::interpolate (concentration_dof_handler,
             exact_concentration_neg,
             exact_concentration_solution_neg);
-        concentration_constraints.distribute (exact_concentration_solution_neg);
+//        concentration_constraints.distribute (exact_concentration_solution_neg);
 
         EquationData::ExactSolution_concentration_pos<dim> exact_concentration_pos;
         exact_concentration_pos.set_time(time);
         VectorTools::interpolate (concentration_dof_handler,
             exact_concentration_pos,
             exact_concentration_solution_pos);
-        concentration_constraints.distribute (exact_concentration_solution_pos);
+//        concentration_constraints.distribute (exact_concentration_solution_pos);
        
         if (timestep_number == 0 )
         {
@@ -1403,7 +1410,7 @@ start_time_iteration:
 */
       }
       // Do all the above until we arrive at time 100.
-      while (timestep_number <= 20000);
+      while (timestep_number <= 10);
     }
 }
 
