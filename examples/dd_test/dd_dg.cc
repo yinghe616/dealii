@@ -548,7 +548,8 @@ namespace fem_dg
     void DriftDiffusionProblem<dim>::integrate_cell_term_advection (DoFInfo &dinfo,
         CellInfo &info,
         Vector<double> &coef)
-    {
+    { 
+      // compute advection term -(c_n\grad\phi,\grad\psi)
       const FEValuesBase<dim> &fe_v = info.fe_values();
       FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
       const std::vector<double> &JxW = fe_v.get_JxW_values ();
@@ -799,35 +800,33 @@ namespace fem_dg
 
     for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
     {
-      // This term we've already seen:
+      // assemble the term $-0.5(n_x^- dudx^-, v^-)_{\partial \kappa_-}$,
       for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
         for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-          u1_v1_matrix(i,j) += 0.5*( normals[point] *
+          u1_v1_matrix(i,j) -= 0.5*( normals[point] *
             fe_v.shape_grad(j,point) )*
             fe_v.shape_value(i,point) *
             JxW[point];
 
-      // We additionally assemble the term $(\beta\cdot n u,\hat
-      // v)_{\partial \kappa_+}$,
+      // assemble the term $-0.5(n_x^- dudx^+, v^-)_{\partial \kappa_-}$,
       for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
         for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-          u1_v2_matrix(k,j) += 0.5 * (normals[point] *
+          u1_v2_matrix(k,j) -= 0.5 * (normals[point] *
             fe_v.shape_grad(j,point)) *
             fe_v_neighbor.shape_value(k,point) *
             JxW[point];
 
-      // This one we've already seen, too:
+      // assemble the term $0.5(n_x^- dudx^+, v^+)_{\partial \kappa_+}$,
       for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
         for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-          u2_v1_matrix(i,l) -= 0.5 * (normals[point]*
+          u2_v1_matrix(i,l) += 0.5 * (normals[point]*
             fe_v_neighbor.shape_grad(l,point)) *
             fe_v.shape_value(i,point) *
             JxW[point];
-      // And this is another new one: $(\beta\cdot n \hat u,\hat
-      // v)_{\partial \kappa_-}$:
+      // assemble the term $0.5(n_x^- u^-, v^+)_{\partial \kappa_+}$,
       for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
         for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-          u2_v2_matrix(k,l) -= 0.5 * (normals[point]*
+          u2_v2_matrix(k,l) += 0.5 * (normals[point]*
             fe_v_neighbor.shape_grad(l,point)) *
             fe_v_neighbor.shape_value(k,point) *
             JxW[point];
@@ -1241,7 +1240,7 @@ namespace fem_dg
         time_step = 1*h_min*h_min;///maximal_potential;
         std::cout << "Time step " << time_step << std::endl;
 #else
-        time_step = 0.001;
+        time_step = 0.0001;
 #endif
       }
 
@@ -1343,7 +1342,8 @@ namespace fem_dg
           (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
            dof_info, info_box,
            integrate_cell_term_advection_bind,
-           integrate_boundary_term_advection_bind,
+         //  integrate_boundary_term_advection_bind,
+           NULL,
            integrate_face_term_advection_bind,
            assembler1);
 
@@ -1378,15 +1378,15 @@ namespace fem_dg
       // build right hand side vector
       {
         concentration_rhs_neg=0;
-        Vector<double> sol_tmp (concentration_dof_handler.n_dofs());
         concentration_advec_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
         concentration_rhs_neg*= -time_step;
+        Vector<double> sol_tmp (concentration_dof_handler.n_dofs());
         concentration_mass_matrix.vmult(sol_tmp, concentration_solution_neg);
         concentration_rhs_neg += sol_tmp;
 
         concentration_rhs_pos=0;
         concentration_advec_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
-        concentration_rhs_pos *= time_step;
+        concentration_rhs_pos *= +time_step;
         concentration_mass_matrix.vmult(sol_tmp, concentration_solution_pos);
         concentration_rhs_pos += sol_tmp;
       }
