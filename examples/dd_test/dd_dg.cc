@@ -410,6 +410,9 @@ namespace fem_dg
 
         SparseMatrix<double>                concentration_mass_matrix;
         SparseMatrix<double>                concentration_laplace_matrix;
+        SparseMatrix<double>                concentration_advec_matrix;
+        SparseMatrix<double>                concentration_face_advec_matrix;
+        SparseMatrix<double>                concentration_face_diffusion_matrix;
         SparseMatrix<double>                concentration_matrix_neg;
         SparseMatrix<double>                concentration_matrix_pos;
 
@@ -438,7 +441,7 @@ namespace fem_dg
         bool                                rebuild_poisson_matrix;
         bool                                rebuild_concentration_matrices;
 
-//#define AMR
+        //#define AMR
 
 #define OUTPUT_FILE
 #ifdef OUTPUT_FILE
@@ -448,6 +451,29 @@ namespace fem_dg
         const string output_path_m = "./output_m.txt";
         const string output_path_c = "./output_c.txt";
 #endif
+
+        // adding DG part
+
+        typedef MeshWorker::DoFInfo<dim> DoFInfo;
+
+        void integrate_cell_term_mass (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_cell_term_advection (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_cell_term_source (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_boundary_term_advection (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_face_term_advection (DoFInfo &dinfo1,
+            DoFInfo &dinfo2,
+            CellInfo &info1,
+            CellInfo &info2,
+            Vector<double> &coef);
+
     };
 
   // @sect4{DriftDiffusionProblem::DriftDiffusionProblem}
@@ -489,6 +515,239 @@ namespace fem_dg
 #endif
       }
 
+
+  // @sect4{The local integrators}
+
+  // These are the functions given to the MeshWorker::integration_loop()
+  // called just above. They compute the local contributions to the system
+  // matrix and right hand side on cells and faces.
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_advection (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+
+      //construct potential_cell and fe_values
+      typename DoFHandler<dim>::active_cell_iterator potential_cell(&(dinfo.cell->get_triangulation()),
+          dinfo.cell->level(),
+          dinfo.cell->index(),
+          &potential_dof_handler);
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+      FEValues<dim> potential_fe_values(potential_fe,quadrature_formula,update_values | update_gradients);
+      potential_fe_values.reinit(potential_cell);
+
+      std::vector<Tensor<1,dim> > potential_grad_values(n_q_points);
+
+      potential_fe_values.get_function_gradients (coef,
+          potential_grad_values);
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+          {
+            local_matrix(i,j) -= potential_grad_values[point]*fe_v.shape_grad(i,point)*
+              fe_v.shape_value(j,point) *
+              JxW[point];
+          }
+        }
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_source (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+    }
+
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_mass (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      // First, let us retrieve some of the objects used here from @p info. Note
+      // that these objects can handle much more complex structures, thus the
+      // access here looks more complicated than might seem necessary.
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      Vector<double> &local_vector = dinfo.vector(0).block(0);
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      std::vector<double> g(fe_v.n_quadrature_points);
+      EquationData::ConcentrationNegativeRightHandSide<dim>  concentration_right_hand_side;
+      concentration_right_hand_side.value_list (fe_v.get_quadrature_points(), g);
+
+      typename DoFHandler<dim>::active_cell_iterator potential_cell(&(dinfo.cell->get_triangulation()),
+          dinfo.cell->level(),
+          dinfo.cell->index(),
+          &potential_dof_handler);
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = fe_v.n_quadrature_points;
+      FEValues<dim> potential_fe_values(potential_fe,quadrature_formula,update_values| update_gradients);
+      potential_fe_values.reinit(potential_cell);
+
+
+      std::vector<Tensor<1,dim> > potential_grad_values(n_q_points);
+
+      potential_fe_values.get_function_gradients (coef, potential_grad_values);
+      // With these objects, we continue local integration like always. First,
+      // we loop over the quadrature points and compute the advection vector in
+      // the current point.
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+          local_matrix(i,j) += fe_v.shape_value(i,point)*
+            fe_v.shape_value(j,point) *
+            JxW[point];
+
+          local_vector(i) += g[point]*
+            fe_v.shape_value(i,point) *
+            JxW[point];
+        }
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_boundary_term_advection (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      Vector<double> &local_vector = dinfo.vector(0).block(0);
+
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      std::vector<double> g(fe_v.n_quadrature_points);
+
+      //BoundaryValues<dim> boundary_function(t);
+      //boundary_function.value_list (fe_v.get_quadrature_points(), g);
+
+      //construct potential_cell and fe_values
+      typename DoFHandler<dim>::active_cell_iterator potential_cell(&(dinfo.cell->get_triangulation()),
+          dinfo.cell->level(),
+          dinfo.cell->index(),
+          &potential_dof_handler);
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+      FEValues<dim> potential_fe_values(potential_fe,quadrature_formula,update_values|update_gradients);
+      potential_fe_values.reinit(potential_cell);
+
+
+      std::vector<Tensor<1,dim> > potential_grad_values(n_q_points);
+
+      potential_fe_values.get_function_gradients (coef,
+          potential_grad_values);
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        const double beta_n=potential_grad_values[point]* normals[point];
+        if (beta_n>0)
+          for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+            for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+              local_matrix(i,j) += beta_n *
+                fe_v.shape_value(j,point) *
+                fe_v.shape_value(i,point) *
+                JxW[point];
+        else
+
+          for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+            local_vector(i) -= beta_n *
+              g[point]*
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
+    }
+
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_face_term_advection (DoFInfo &dinfo1,
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        Vector<double> &coef)
+    {
+      const FEValuesBase<dim> &fe_v = info1.fe_values();
+
+      // For additional shape functions, we have to ask the neighbors
+      // FEValuesBase.
+      const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+
+      FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+      FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+      FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+      FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      //construct potential_cell and fe_values
+      typename DoFHandler<dim>::active_cell_iterator potential_cell(&(dinfo1.cell->get_triangulation()),
+          dinfo1.cell->level(),
+          dinfo1.cell->index(),
+          &potential_dof_handler);
+
+      const QGauss<dim-1> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+
+      FEFaceValues<dim> potential_fe_values(potential_fe,quadrature_formula,update_values| update_gradients);
+      potential_fe_values.reinit(potential_cell,dinfo1.face_number);
+
+
+      std::vector<Tensor<1,dim> > potential_grad_values(n_q_points);
+
+      potential_fe_values.get_function_gradients (coef,
+          potential_grad_values);
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        const double beta_n= potential_grad_values[point] * normals[point];
+        if (beta_n>=0)
+        {
+          // This term we've already seen:
+          for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+            for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+              u1_v1_matrix(i,j) += beta_n *
+                fe_v.shape_value(j,point) *
+                fe_v.shape_value(i,point) *
+                JxW[point];
+
+          // We additionally assemble the term $(\beta\cdot n u,\hat
+          // v)_{\partial \kappa_+}$,
+          for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+            for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+              u1_v2_matrix(k,j) -= beta_n *
+                fe_v.shape_value(j,point) *
+                fe_v_neighbor.shape_value(k,point) *
+                JxW[point];
+        }
+        else
+        {
+          // This one we've already seen, too:
+          for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+            for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
+              u2_v1_matrix(i,l) += beta_n *
+                fe_v_neighbor.shape_value(l,point) *
+                fe_v.shape_value(i,point) *
+                JxW[point];
+          // And this is another new one: $(\beta\cdot n \hat u,\hat
+          // v)_{\partial \kappa_-}$:
+          for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+            for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
+              u2_v2_matrix(k,l) -= beta_n *
+                fe_v_neighbor.shape_value(l,point) *
+                fe_v_neighbor.shape_value(k,point) *
+                JxW[point];
+        }
+      }
+    }
 
 
   // @sect4{DriftDiffusionProblem::get_maximal_potential}
@@ -660,16 +919,22 @@ namespace fem_dg
       {
         concentration_mass_matrix.clear ();
         concentration_laplace_matrix.clear ();
+        concentration_advec_matrix.clear ();
+        concentration_face_advec_matrix.clear ();
+        concentration_face_diffusion_matrix.clear ();
         concentration_matrix_neg.clear ();
         concentration_matrix_pos.clear ();
 
-        CompressedSparsityPattern dsp2 ( concentration_dof_handler.n_dofs(),
+        DynamicSparsityPattern dsp2 (concentration_dof_handler.n_dofs(),
             concentration_dof_handler.n_dofs());
         DoFTools::make_flux_sparsity_pattern (concentration_dof_handler, dsp2);
 
         concentration_sparsity_pattern.copy_from(dsp2);
         concentration_mass_matrix.reinit (concentration_sparsity_pattern);
         concentration_laplace_matrix.reinit (concentration_sparsity_pattern);
+        concentration_advec_matrix.reinit (concentration_sparsity_pattern);
+        concentration_face_advec_matrix.reinit (concentration_sparsity_pattern);
+        concentration_face_diffusion_matrix.reinit (concentration_sparsity_pattern);
         concentration_matrix_neg.reinit (concentration_sparsity_pattern);
         concentration_matrix_pos.reinit (concentration_sparsity_pattern);
       }
@@ -857,23 +1122,22 @@ namespace fem_dg
     void DriftDiffusionProblem<dim>::assemble_concentration_matrix ()
     {
       // Once we know the Stokes solution, we can determine the new time step
-
-      old_time_step = time_step;
-      const double maximal_potential = get_maximal_potential();
+      {
+        old_time_step = time_step;
+        const double maximal_potential = get_maximal_potential();
 
 #if 0
-      std::cout << "max eletric field " << maximal_potential << std::endl;
-      double h_min=GridTools::minimal_cell_diameter(triangulation);
-      std::cout << "min cell diameter " << h_min << std::endl;
-      time_step = 1*h_min*h_min;///maximal_potential;
-      std::cout << "Time step " << time_step << std::endl;
+        std::cout << "max eletric field " << maximal_potential << std::endl;
+        double h_min=GridTools::minimal_cell_diameter(triangulation);
+        std::cout << "min cell diameter " << h_min << std::endl;
+        time_step = 1*h_min*h_min;///maximal_potential;
+        std::cout << "Time step " << time_step << std::endl;
 #else
-      time_step = 0.0001;
+        time_step = 0.0001;
 #endif
+      }
 
-
-      concentration_rhs_neg=0;
-      concentration_rhs_pos=0;
+      // set up necessary dofs
 
       const QGauss<dim> quadrature_formula (concentration_degree+2);
       FEValues<dim>     poisson_fe_values (potential_fe, quadrature_formula,
@@ -887,174 +1151,160 @@ namespace fem_dg
           update_gradients    |
           update_quadrature_points  |
           update_JxW_values );
-
       const unsigned int   dofs_per_cell = concentration_fe.dofs_per_cell;
       const unsigned int   n_q_points    = quadrature_formula.size();
 
-      FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
-      Vector<double>       cell_rhs_neg (dofs_per_cell);
-      Vector<double>       cell_rhs_pos (dofs_per_cell);
-      std::vector<double>       concentration_neg_values(n_q_points);
-      std::vector<double>       concentration_pos_values(n_q_points);
-      std::vector< Tensor<1,dim> >       grad_poisson_values(n_q_points);
-
-      const EquationData::MobilityValues<dim>     mobility_func;
-      const EquationData::DiffusivityValues<dim>     diffusivity_func;
-
-      std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
-
-      typename DoFHandler<dim>::active_cell_iterator
-        cell = concentration_dof_handler.begin_active(),
-             endc = concentration_dof_handler.end();
-      typename DoFHandler<dim>::active_cell_iterator
-        cell2 = potential_dof_handler.begin_active(),
-             endc2 = potential_dof_handler.end();
-
-      if (rebuild_concentration_matrices)
+      // build mass matrix and laplace matrices
       {
-        rebuild_concentration_matrices = false;
-        std::cout << "   Assembling concentration..." << std::endl;
-        concentration_matrix_neg=0;
-        concentration_matrix_pos=0;
-        MatrixCreator::create_mass_matrix(concentration_dof_handler,
-            QGauss<dim>(concentration_fe.degree+1),
-            concentration_mass_matrix);
-        concentration_matrix_neg.copy_from(concentration_mass_matrix);
-        concentration_matrix_pos.copy_from(concentration_mass_matrix);
-        MatrixCreator::create_laplace_matrix(concentration_dof_handler,
-            QGauss<dim>(concentration_fe.degree+1),
-            concentration_laplace_matrix);
-        concentration_matrix_neg.add(time_step, concentration_laplace_matrix);
-        concentration_matrix_pos.add(time_step, concentration_laplace_matrix);
-        /*
-           for (; cell!=endc; ++cell)
-           { 
-           cell_matrix = 0;
-           cell->get_dof_indices (local_dof_indices);
-           concentration_fe_values.reinit (cell);
-           for (unsigned int i=0; i<dofs_per_cell; ++i)
-           {  for (unsigned int j=0; j<dofs_per_cell; ++j)
-           {
-           for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
-           { 
-           cell_matrix(i,j) +=
-           time_step*
-        //                  diffusivity_func.value(concentration_fe_values.quadrature_point (q_index))*
-        concentration_fe_values.shape_grad (i, q_index) *
-        concentration_fe_values.shape_grad (j, q_index) *
-        concentration_fe_values.JxW (q_index); 
-        }
-        concentration_matrix_neg.add (local_dof_indices[i],
-        local_dof_indices[j],
-        cell_matrix(i,j));
-        concentration_matrix_pos.add (local_dof_indices[i],
-        local_dof_indices[j],
-        cell_matrix(i,j));
-        }
-        }
-        }
-        */
-      }
-
-      cell = concentration_dof_handler.begin_active();
-      cell2 = potential_dof_handler.begin_active();
-      EquationData::ConcentrationNegativeRightHandSide<dim> concentration_neg_right_hand_side;
-      EquationData::ConcentrationPositiveRightHandSide<dim> concentration_pos_right_hand_side;
-      concentration_neg_right_hand_side.set_time(time);
-      concentration_pos_right_hand_side.set_time(time);
-
-      for (; cell!=endc, cell2!=endc2; ++cell, ++cell2)
-      {
-        cell->get_dof_indices (local_dof_indices);
-        concentration_fe_values.reinit (cell);
-        poisson_fe_values.reinit (cell2);
-        poisson_fe_values.get_function_gradients(potential_solution, grad_poisson_values);
-        concentration_fe_values.get_function_values(exact_concentration_solution_neg, concentration_neg_values);
-        concentration_fe_values.get_function_values(exact_concentration_solution_pos, concentration_pos_values);
-        cell_rhs_neg = 0;
-        cell_rhs_pos = 0;
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
+        if (rebuild_concentration_matrices)
         {
-          for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
-          {
-            cell_rhs_neg(i) += 
-              concentration_neg_values[q_index]*concentration_fe_values.shape_value(i, q_index)*concentration_fe_values.JxW (q_index)
-              +
-              time_step*
-              (
-               (concentration_fe_values.shape_grad (i, q_index) *
-                grad_poisson_values[q_index]*
-                mobility_func.value(concentration_fe_values.quadrature_point (q_index))
-               )*
-               concentration_neg_values[q_index]
-               +
-               concentration_neg_right_hand_side.value(concentration_fe_values.quadrature_point (q_index))
-               *concentration_fe_values.shape_value(i, q_index)
-              )*concentration_fe_values.JxW (q_index);
-            cell_rhs_pos(i) +=
-              concentration_pos_values[q_index]*concentration_fe_values.shape_value(i, q_index)*concentration_fe_values.JxW (q_index)
-              +
-              time_step*
-              (
-               (-concentration_fe_values.shape_grad (i, q_index) *
-                grad_poisson_values[q_index]*
-                mobility_func.value(concentration_fe_values.quadrature_point (q_index))
-               )*
-               concentration_pos_values[q_index]
-               +
-               concentration_pos_right_hand_side.value(concentration_fe_values.quadrature_point (q_index))
-               *concentration_fe_values.shape_value(i, q_index)
-              )*concentration_fe_values.JxW (q_index);
+          std::cout << "   Assembling concentration..." << std::endl;
+          concentration_matrix_neg=0;
+          concentration_matrix_pos=0;
+          MatrixCreator::create_mass_matrix(concentration_dof_handler,
+              QGauss<dim>(concentration_fe.degree+1),
+              concentration_mass_matrix);
+          concentration_matrix_neg.copy_from(concentration_mass_matrix);
+          concentration_matrix_pos.copy_from(concentration_mass_matrix);
+          MatrixCreator::create_laplace_matrix(concentration_dof_handler,
+              QGauss<dim>(concentration_fe.degree+1),
+              concentration_laplace_matrix);
+          concentration_matrix_neg.add(time_step, concentration_laplace_matrix);
+          concentration_matrix_pos.add(time_step, concentration_laplace_matrix);
+          /*
+             for (; cell!=endc; ++cell)
+             { 
+             cell_matrix = 0;
+             cell->get_dof_indices (local_dof_indices);
+             concentration_fe_values.reinit (cell);
+             for (unsigned int i=0; i<dofs_per_cell; ++i)
+             {  for (unsigned int j=0; j<dofs_per_cell; ++j)
+             {
+             for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
+             { 
+             cell_matrix(i,j) +=
+             time_step*
+          //                  diffusivity_func.value(concentration_fe_values.quadrature_point (q_index))*
+          concentration_fe_values.shape_grad (i, q_index) *
+          concentration_fe_values.shape_grad (j, q_index) *
+          concentration_fe_values.JxW (q_index); 
           }
-          concentration_rhs_neg(local_dof_indices[i]) += cell_rhs_neg(i);
-          concentration_rhs_pos(local_dof_indices[i]) += cell_rhs_pos(i);
+          concentration_matrix_neg.add (local_dof_indices[i],
+          local_dof_indices[j],
+          cell_matrix(i,j));
+          concentration_matrix_pos.add (local_dof_indices[i],
+          local_dof_indices[j],
+          cell_matrix(i,j));
+          }
+          }
+          }
+          */
+          rebuild_concentration_matrices = false;
         }
+      }
+      // build face diffusion matrix matrices
+      {
+
+      }
+      // build face advection matrix and advection matrices
+      {
+        MeshWorker::IntegrationInfoBox<dim> info_box;
+        const unsigned int n_gauss_points = concentration_dof_handler.get_fe().degree+1;
+        info_box.initialize_gauss_quadrature(n_gauss_points,
+            n_gauss_points,
+            n_gauss_points);
+        info_box.initialize_update_flags();
+        UpdateFlags update_flags = update_quadrature_points |
+          update_values            |
+          update_gradients;
+        info_box.add_update_flags(update_flags, true, true, true, true);
+
+        info_box.initialize(concentration_fe, mapping);
+        Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
+
+        MeshWorker::DoFInfo<dim> dof_info(concentration_dof_handler);
+        // obtain advection matrix
+        concentration_advec_matrix.reinit (concentration_sparsity_pattern);
+        rhs_tmp.reinit(concentration_dof_handler.n_dofs());
+        MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double> > assembler1;
+        assembler1.initialize(concentration_advec_matrix, rhs_tmp);
+        //bind definitions
+        auto integrate_cell_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_advection,
+            this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
+        auto integrate_boundary_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_advection,
+            this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
+        auto integrate_face_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->potential_solution);
+
+        MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
+          (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
+           dof_info, info_box,
+           integrate_cell_term_advection_bind,
+           integrate_boundary_term_advection_bind,
+           integrate_face_term_advection_bind,
+           assembler1);
+
+      }
+      // build right hand side vector
+      {
+        concentration_rhs_neg=0;
+        Vector<double> sol_tmp (concentration_dof_handler.n_dofs());
+        concentration_advec_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
+        concentration_rhs_neg*= -time_step;
+        concentration_mass_matrix.vmult(sol_tmp, concentration_solution_neg);
+        concentration_rhs_neg += sol_tmp;
+
+        concentration_rhs_pos=0;
+        concentration_advec_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
+        concentration_rhs_pos *= time_step;
+        concentration_mass_matrix.vmult(sol_tmp, concentration_solution_pos);
+        concentration_rhs_pos += sol_tmp;
       }
       // DG elements dont need to apply the constraints
-//      concentration_constraints.condense (concentration_matrix_neg, concentration_rhs_neg); 
-//      concentration_constraints.condense (concentration_matrix_pos, concentration_rhs_pos); 
-/*
+      //      concentration_constraints.condense (concentration_matrix_neg, concentration_rhs_neg); 
+      //      concentration_constraints.condense (concentration_matrix_pos, concentration_rhs_pos); 
+      /*
 
-      EquationData::ExactSolution_concentration_neg<dim> exact_concentration_neg;
-      EquationData::ExactSolution_concentration_pos<dim> exact_concentration_pos;
-      exact_concentration_neg.set_time(time);
-      exact_concentration_pos.set_time(time);
-      std::map<types::global_dof_index,double> boundary_values_neg;
-      VectorTools::interpolate_boundary_values (concentration_dof_handler,
-          1,
-          exact_concentration_neg,
-          boundary_values_neg);
-      VectorTools::interpolate_boundary_values (concentration_dof_handler,
-          2,
-          exact_concentration_neg,
-          boundary_values_neg);
-      VectorTools::interpolate_boundary_values (concentration_dof_handler,
-          3,
-          exact_concentration_neg,
-          boundary_values_neg);
-      MatrixTools::apply_boundary_values (boundary_values_neg,
-          concentration_matrix_neg,
-          concentration_solution_neg,
-          concentration_rhs_neg);
+         EquationData::ExactSolution_concentration_neg<dim> exact_concentration_neg;
+         EquationData::ExactSolution_concentration_pos<dim> exact_concentration_pos;
+         exact_concentration_neg.set_time(time);
+         exact_concentration_pos.set_time(time);
+         std::map<types::global_dof_index,double> boundary_values_neg;
+         VectorTools::interpolate_boundary_values (concentration_dof_handler,
+         1,
+         exact_concentration_neg,
+         boundary_values_neg);
+         VectorTools::interpolate_boundary_values (concentration_dof_handler,
+         2,
+         exact_concentration_neg,
+         boundary_values_neg);
+         VectorTools::interpolate_boundary_values (concentration_dof_handler,
+         3,
+         exact_concentration_neg,
+         boundary_values_neg);
+         MatrixTools::apply_boundary_values (boundary_values_neg,
+         concentration_matrix_neg,
+         concentration_solution_neg,
+         concentration_rhs_neg);
 
-      std::map<types::global_dof_index,double> boundary_values_pos;
-      VectorTools::interpolate_boundary_values (concentration_dof_handler,
-          1,
-          exact_concentration_pos,
-          boundary_values_pos);
-      VectorTools::interpolate_boundary_values (concentration_dof_handler,
-          2,
-          exact_concentration_pos,
-          boundary_values_pos);
-      VectorTools::interpolate_boundary_values (concentration_dof_handler,
-          3,
-          exact_concentration_pos,
-          boundary_values_pos);
-      MatrixTools::apply_boundary_values (boundary_values_pos,
-          concentration_matrix_pos,
-          concentration_solution_pos,
-          concentration_rhs_pos);
-          */
+         std::map<types::global_dof_index,double> boundary_values_pos;
+         VectorTools::interpolate_boundary_values (concentration_dof_handler,
+         1,
+         exact_concentration_pos,
+         boundary_values_pos);
+         VectorTools::interpolate_boundary_values (concentration_dof_handler,
+         2,
+         exact_concentration_pos,
+         boundary_values_pos);
+         VectorTools::interpolate_boundary_values (concentration_dof_handler,
+         3,
+         exact_concentration_pos,
+         boundary_values_pos);
+         MatrixTools::apply_boundary_values (boundary_values_pos,
+         concentration_matrix_pos,
+         concentration_solution_pos,
+         concentration_rhs_pos);
+         */
     }
 
 
