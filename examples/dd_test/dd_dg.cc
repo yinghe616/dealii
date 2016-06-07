@@ -469,7 +469,12 @@ namespace fem_dg
         void integrate_boundary_term_advection (DoFInfo &dinfo,
             CellInfo &info,
             Vector<double> &coef);
-        void integrate_face_term_advection (DoFInfo &dinfo1,
+        void integrate_face_term_advection_neg (DoFInfo &dinfo1,
+            DoFInfo &dinfo2,
+            CellInfo &info1,
+            CellInfo &info2,
+            Vector<double> &coef);
+        void integrate_face_term_advection_pos (DoFInfo &dinfo1,
             DoFInfo &dinfo2,
             CellInfo &info1,
             CellInfo &info2,
@@ -692,7 +697,7 @@ namespace fem_dg
 
 
   template <int dim>
-    void DriftDiffusionProblem<dim>::integrate_face_term_advection (DoFInfo &dinfo1,
+    void DriftDiffusionProblem<dim>::integrate_face_term_advection_neg (DoFInfo &dinfo1,
         DoFInfo &dinfo2,
         CellInfo &info1,
         CellInfo &info2,
@@ -743,7 +748,7 @@ namespace fem_dg
       {
         double beta_n1= potential_grad_values1[point] * normals[point];
         double beta_n2= potential_grad_values2[point] * normals[point];
-        beta_n2=beta_n1;
+        //beta_n2 = beta_n1;
         if (beta_n1>=0)
         {
           // This term we've already seen:
@@ -784,6 +789,102 @@ namespace fem_dg
       }
     }
   
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_face_term_advection_pos (DoFInfo &dinfo1,
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        Vector<double> &coef)
+    {
+      const FEValuesBase<dim> &fe_v = info1.fe_values();
+
+      // For additional shape functions, we have to ask the neighbors
+      // FEValuesBase.
+      const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+
+      FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+      FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+      FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+      FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      //construct potential_cell and fe_values
+      typename DoFHandler<dim>::active_cell_iterator potential_cell1(&(dinfo1.cell->get_triangulation()),
+          dinfo1.cell->level(),
+          dinfo1.cell->index(),
+          &potential_dof_handler);
+      typename DoFHandler<dim>::active_cell_iterator potential_cell2(&(dinfo2.cell->get_triangulation()),
+          dinfo2.cell->level(),
+          dinfo2.cell->index(),
+          &potential_dof_handler);
+
+      const QGauss<dim-1> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+
+      FEFaceValues<dim> potential_fe_values1(potential_fe,quadrature_formula,update_values| update_gradients);
+      potential_fe_values1.reinit(potential_cell1,dinfo1.face_number);
+
+      FEFaceValues<dim> potential_fe_values2(potential_fe,quadrature_formula,update_values| update_gradients);
+      potential_fe_values2.reinit(potential_cell2,dinfo2.face_number);
+
+      std::vector<Tensor<1,dim> > potential_grad_values1(n_q_points);
+      std::vector<Tensor<1,dim> > potential_grad_values2(n_q_points);
+
+      potential_fe_values1.get_function_gradients (coef,
+          potential_grad_values1);
+      potential_fe_values2.get_function_gradients (coef,
+          potential_grad_values2);
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        double beta_n1= -potential_grad_values1[point] * normals[point];
+        double beta_n2= -potential_grad_values2[point] * normals[point];
+        if (beta_n1>=0)
+        {
+          // This term we've already seen:
+          for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+            for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+              u1_v1_matrix(i,j) += beta_n1 *
+                fe_v.shape_value(j,point) *
+                fe_v.shape_value(i,point) *
+                JxW[point];
+
+          // We additionally assemble the term $(\beta\cdot n u,\hat
+          // v)_{\partial \kappa_+}$,
+          for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+            for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+              u1_v2_matrix(k,j) -= beta_n2 *
+                fe_v.shape_value(j,point) *
+                fe_v_neighbor.shape_value(k,point) *
+                JxW[point];
+        }
+        else
+        {
+          // This one we've already seen, too:
+          for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+            for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
+              u2_v1_matrix(i,l) += beta_n1 *
+                fe_v_neighbor.shape_value(l,point) *
+                fe_v.shape_value(i,point) *
+                JxW[point];
+          // And this is another new one: $(\beta\cdot n \hat u,\hat
+          // v)_{\partial \kappa_-}$:
+          for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+            for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
+              u2_v2_matrix(k,l) -= beta_n2 *
+                fe_v_neighbor.shape_value(l,point) *
+                fe_v_neighbor.shape_value(k,point) *
+                JxW[point];
+        }
+
+
+      }
+
+    }
+
+
 
   template <int dim>
     void DriftDiffusionProblem<dim>::integrate_face_term_diffusion (DoFInfo &dinfo1,
@@ -1362,8 +1463,8 @@ namespace fem_dg
             this, std::placeholders::_1, std::placeholders::_2, this->exact_potential_solution);
         auto integrate_boundary_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_advection,
             this, std::placeholders::_1, std::placeholders::_2, this->exact_potential_solution);
-        auto integrate_face_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->exact_potential_solution);
+        auto integrate_face_term_advection_neg_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection_neg,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->potential_solution);
 
         MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
           (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
@@ -1372,11 +1473,26 @@ namespace fem_dg
          //  integrate_boundary_term_advection_bind,
            NULL,
            NULL,
-           integrate_face_term_advection_bind,
+           integrate_face_term_advection_neg_bind,
            assembler1);
 
         concentration_matrix_neg.add(-time_step, concentration_face_advec_matrix);
-        concentration_matrix_pos.add(+time_step, concentration_face_advec_matrix);
+        
+        concentration_face_advec_matrix.reinit (concentration_sparsity_pattern);
+        rhs_tmp.reinit(concentration_dof_handler.n_dofs());
+        MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double> > assembler3;
+        assembler3.initialize(concentration_face_advec_matrix, rhs_tmp);
+        auto integrate_face_term_advection_pos_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection_pos,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->potential_solution);
+        MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
+          (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
+           dof_info, info_box,
+           NULL,
+           NULL,
+           integrate_face_term_advection_pos_bind,
+           assembler3);
+
+        concentration_matrix_pos.add(time_step, concentration_face_advec_matrix);
 
         // build face diffusion matrix matrices
         if (rebuild_concentration_matrices)
@@ -1713,7 +1829,7 @@ namespace fem_dg
           Point<dim>  (-1,-1),
           Point<dim>  ( 1, 1));
       global_Omega_diameter = GridTools::diameter (triangulation);
-      triangulation.refine_global (5); //if want to use global uniform mesh
+      triangulation.refine_global (4); //if want to use global uniform mesh
   //    triangulation.refine_global (initial_refinement);
 
       setup_dofs();
