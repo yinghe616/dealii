@@ -713,32 +713,43 @@ namespace fem_dg
       const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
 
       //construct potential_cell and fe_values
-      typename DoFHandler<dim>::active_cell_iterator potential_cell(&(dinfo1.cell->get_triangulation()),
+      typename DoFHandler<dim>::active_cell_iterator potential_cell1(&(dinfo1.cell->get_triangulation()),
           dinfo1.cell->level(),
           dinfo1.cell->index(),
+          &potential_dof_handler);
+      typename DoFHandler<dim>::active_cell_iterator potential_cell2(&(dinfo2.cell->get_triangulation()),
+          dinfo2.cell->level(),
+          dinfo2.cell->index(),
           &potential_dof_handler);
 
       const QGauss<dim-1> quadrature_formula(concentration_degree+1);
       const unsigned int n_q_points = quadrature_formula.size();
 
-      FEFaceValues<dim> potential_fe_values(potential_fe,quadrature_formula,update_values| update_gradients);
-      potential_fe_values.reinit(potential_cell,dinfo1.face_number);
+      FEFaceValues<dim> potential_fe_values1(potential_fe,quadrature_formula,update_values| update_gradients);
+      potential_fe_values1.reinit(potential_cell1,dinfo1.face_number);
 
+      FEFaceValues<dim> potential_fe_values2(potential_fe,quadrature_formula,update_values| update_gradients);
+      potential_fe_values2.reinit(potential_cell2,dinfo2.face_number);
 
-      std::vector<Tensor<1,dim> > potential_grad_values(n_q_points);
+      std::vector<Tensor<1,dim> > potential_grad_values1(n_q_points);
+      std::vector<Tensor<1,dim> > potential_grad_values2(n_q_points);
 
-      potential_fe_values.get_function_gradients (coef,
-          potential_grad_values);
+      potential_fe_values1.get_function_gradients (coef,
+          potential_grad_values1);
+      potential_fe_values2.get_function_gradients (coef,
+          potential_grad_values2);
 
       for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
       {
-        const double beta_n= potential_grad_values[point] * normals[point];
-        if (beta_n>=0)
+        double beta_n1= potential_grad_values1[point] * normals[point];
+        double beta_n2= potential_grad_values2[point] * normals[point];
+        beta_n2=beta_n1;
+        if (beta_n1>=0)
         {
           // This term we've already seen:
           for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
             for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-              u1_v1_matrix(i,j) += beta_n *
+              u1_v1_matrix(i,j) += beta_n1 *
                 fe_v.shape_value(j,point) *
                 fe_v.shape_value(i,point) *
                 JxW[point];
@@ -747,7 +758,7 @@ namespace fem_dg
           // v)_{\partial \kappa_+}$,
           for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
             for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-              u1_v2_matrix(k,j) -= beta_n *
+              u1_v2_matrix(k,j) -= beta_n2 *
                 fe_v.shape_value(j,point) *
                 fe_v_neighbor.shape_value(k,point) *
                 JxW[point];
@@ -757,7 +768,7 @@ namespace fem_dg
           // This one we've already seen, too:
           for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
             for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-              u2_v1_matrix(i,l) += beta_n *
+              u2_v1_matrix(i,l) += beta_n1 *
                 fe_v_neighbor.shape_value(l,point) *
                 fe_v.shape_value(i,point) *
                 JxW[point];
@@ -765,7 +776,7 @@ namespace fem_dg
           // v)_{\partial \kappa_-}$:
           for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
             for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-              u2_v2_matrix(k,l) -= beta_n *
+              u2_v2_matrix(k,l) -= beta_n2 *
                 fe_v_neighbor.shape_value(l,point) *
                 fe_v_neighbor.shape_value(k,point) *
                 JxW[point];
@@ -1240,7 +1251,7 @@ namespace fem_dg
         time_step = 1*h_min*h_min;///maximal_potential;
         std::cout << "Time step " << time_step << std::endl;
 #else
-        time_step = 0.0001;
+        time_step = 0.000001;
 #endif
       }
 
@@ -1261,53 +1272,69 @@ namespace fem_dg
       const unsigned int   dofs_per_cell = concentration_fe.dofs_per_cell;
       const unsigned int   n_q_points    = quadrature_formula.size();
 
-      // build mass matrix and laplace matrices
+      // build mass matrix and laplace and advection matrices
       {
         if (rebuild_concentration_matrices)
         {
           std::cout << "   Assembling concentration..." << std::endl;
           concentration_matrix_neg=0;
           concentration_matrix_pos=0;
+          //Mass
           MatrixCreator::create_mass_matrix(concentration_dof_handler,
               QGauss<dim>(concentration_fe.degree+1),
               concentration_mass_matrix);
           concentration_matrix_neg.copy_from(concentration_mass_matrix);
           concentration_matrix_pos.copy_from(concentration_mass_matrix);
+          //laplace
           MatrixCreator::create_laplace_matrix(concentration_dof_handler,
               QGauss<dim>(concentration_fe.degree+1),
               concentration_laplace_matrix);
           concentration_matrix_neg.add(time_step, concentration_laplace_matrix);
           concentration_matrix_pos.add(time_step, concentration_laplace_matrix);
-          /*
-             for (; cell!=endc; ++cell)
-             { 
-             cell_matrix = 0;
-             cell->get_dof_indices (local_dof_indices);
-             concentration_fe_values.reinit (cell);
-             for (unsigned int i=0; i<dofs_per_cell; ++i)
-             {  for (unsigned int j=0; j<dofs_per_cell; ++j)
-             {
-             for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
-             { 
-             cell_matrix(i,j) +=
-             time_step*
-          //                  diffusivity_func.value(concentration_fe_values.quadrature_point (q_index))*
-          concentration_fe_values.shape_grad (i, q_index) *
-          concentration_fe_values.shape_grad (j, q_index) *
-          concentration_fe_values.JxW (q_index); 
+          // advection 
+          FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
+          std::vector< Tensor<1,dim> >       grad_poisson_values(n_q_points);
+          std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
+          const EquationData::MobilityValues<dim>     mobility_func;
+          typename DoFHandler<dim>::active_cell_iterator
+            cell = concentration_dof_handler.begin_active(),
+                 endc = concentration_dof_handler.end();
+          typename DoFHandler<dim>::active_cell_iterator
+            cell2 = potential_dof_handler.begin_active(),
+                 endc2 = potential_dof_handler.end();
+
+          for (; cell!=endc, cell2!=endc2; ++cell, ++cell2)
+          { 
+            cell_matrix = 0;
+            cell->get_dof_indices (local_dof_indices);
+            concentration_fe_values.reinit (cell);
+            poisson_fe_values.reinit (cell2);
+            poisson_fe_values.get_function_gradients(potential_solution, grad_poisson_values);
+            for (unsigned int i=0; i<dofs_per_cell; ++i)
+            {  for (unsigned int j=0; j<dofs_per_cell; ++j)
+              {
+                for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
+                { 
+                  cell_matrix(i,j) +=
+                    (
+                     concentration_fe_values.shape_value (j, q_index) *
+                     grad_poisson_values[q_index]*
+                     concentration_fe_values.shape_grad (i, q_index) *
+                     mobility_func.value(concentration_fe_values.quadrature_point (q_index))
+                     )*
+                    concentration_fe_values.JxW (q_index); 
+                }
+                concentration_advec_matrix.add (local_dof_indices[i],
+                    local_dof_indices[j],
+                    cell_matrix(i,j));
+              }
+            }
           }
-          concentration_matrix_neg.add (local_dof_indices[i],
-          local_dof_indices[j],
-          cell_matrix(i,j));
-          concentration_matrix_pos.add (local_dof_indices[i],
-          local_dof_indices[j],
-          cell_matrix(i,j));
-          }
-          }
-          }
-          */
+          concentration_matrix_neg.add(-time_step, concentration_advec_matrix);
+          concentration_matrix_pos.add(+time_step, concentration_advec_matrix);
         }
-      }
+      }// end of  build mass matrix and laplace and advection matrices
+
       // build face advection matrix and advection matrices
       {
         MeshWorker::IntegrationInfoBox<dim> info_box;
@@ -1329,23 +1356,27 @@ namespace fem_dg
         concentration_advec_matrix.reinit (concentration_sparsity_pattern);
         rhs_tmp.reinit(concentration_dof_handler.n_dofs());
         MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double> > assembler1;
-        assembler1.initialize(concentration_advec_matrix, rhs_tmp);
+        assembler1.initialize(concentration_face_advec_matrix, rhs_tmp);
         //bind definitions
         auto integrate_cell_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
+            this, std::placeholders::_1, std::placeholders::_2, this->exact_potential_solution);
         auto integrate_boundary_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2, this->potential_solution);
+            this, std::placeholders::_1, std::placeholders::_2, this->exact_potential_solution);
         auto integrate_face_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->potential_solution);
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->exact_potential_solution);
 
         MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
           (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
            dof_info, info_box,
-           integrate_cell_term_advection_bind,
+          // integrate_cell_term_advection_bind,
          //  integrate_boundary_term_advection_bind,
+           NULL,
            NULL,
            integrate_face_term_advection_bind,
            assembler1);
+
+        concentration_matrix_neg.add(-time_step, concentration_face_advec_matrix);
+        concentration_matrix_pos.add(+time_step, concentration_face_advec_matrix);
 
         // build face diffusion matrix matrices
         if (rebuild_concentration_matrices)
@@ -1369,8 +1400,8 @@ namespace fem_dg
              integrate_face_term_diffusion_bind,
              assembler2);
 
-          concentration_matrix_neg.add(time_step, concentration_face_diffusion_matrix);
-          concentration_matrix_pos.add(time_step, concentration_face_diffusion_matrix);
+          concentration_matrix_neg.add(-time_step, concentration_face_diffusion_matrix);
+          concentration_matrix_pos.add(-time_step, concentration_face_diffusion_matrix);
           rebuild_concentration_matrices = false;
         }
 
@@ -1378,14 +1409,14 @@ namespace fem_dg
       // build right hand side vector
       {
         concentration_rhs_neg=0;
-        concentration_advec_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
+     //   concentration_advec_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
         concentration_rhs_neg*= -time_step;
         Vector<double> sol_tmp (concentration_dof_handler.n_dofs());
         concentration_mass_matrix.vmult(sol_tmp, concentration_solution_neg);
         concentration_rhs_neg += sol_tmp;
 
         concentration_rhs_pos=0;
-        concentration_advec_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
+     //   concentration_advec_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
         concentration_rhs_pos *= +time_step;
         concentration_mass_matrix.vmult(sol_tmp, concentration_solution_pos);
         concentration_rhs_pos += sol_tmp;
