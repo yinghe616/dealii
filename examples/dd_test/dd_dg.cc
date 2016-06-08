@@ -748,7 +748,8 @@ namespace fem_dg
       {
         double beta_n1= potential_grad_values1[point] * normals[point];
         double beta_n2= potential_grad_values2[point] * normals[point];
-        //beta_n2 = beta_n1;
+        beta_n1 +=beta_n2;
+        beta_n1 *=0.5;
         if (beta_n1>=0)
         {
           // This term we've already seen:
@@ -763,7 +764,7 @@ namespace fem_dg
           // v)_{\partial \kappa_+}$,
           for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
             for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-              u1_v2_matrix(k,j) -= beta_n2 *
+              u1_v2_matrix(k,j) -= beta_n1 *
                 fe_v.shape_value(j,point) *
                 fe_v_neighbor.shape_value(k,point) *
                 JxW[point];
@@ -781,7 +782,7 @@ namespace fem_dg
           // v)_{\partial \kappa_-}$:
           for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
             for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-              u2_v2_matrix(k,l) -= beta_n2 *
+              u2_v2_matrix(k,l) -= beta_n1 *
                 fe_v_neighbor.shape_value(l,point) *
                 fe_v_neighbor.shape_value(k,point) *
                 JxW[point];
@@ -841,6 +842,8 @@ namespace fem_dg
       {
         double beta_n1= -potential_grad_values1[point] * normals[point];
         double beta_n2= -potential_grad_values2[point] * normals[point];
+       // beta_n1 +=beta_n2;
+       // beta_n1 *=0.5;
         if (beta_n1>=0)
         {
           // This term we've already seen:
@@ -855,7 +858,7 @@ namespace fem_dg
           // v)_{\partial \kappa_+}$,
           for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
             for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
-              u1_v2_matrix(k,j) -= beta_n2 *
+              u1_v2_matrix(k,j) -= beta_n1 *
                 fe_v.shape_value(j,point) *
                 fe_v_neighbor.shape_value(k,point) *
                 JxW[point];
@@ -873,7 +876,7 @@ namespace fem_dg
           // v)_{\partial \kappa_-}$:
           for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
             for (unsigned int l=0; l<fe_v_neighbor.dofs_per_cell; ++l)
-              u2_v2_matrix(k,l) -= beta_n2 *
+              u2_v2_matrix(k,l) -= beta_n1 *
                 fe_v_neighbor.shape_value(l,point) *
                 fe_v_neighbor.shape_value(k,point) *
                 JxW[point];
@@ -1476,7 +1479,7 @@ namespace fem_dg
            integrate_face_term_advection_neg_bind,
            assembler1);
 
-        concentration_matrix_neg.add(-time_step, concentration_face_advec_matrix);
+        concentration_matrix_neg.add(+time_step, concentration_face_advec_matrix);
         
         concentration_face_advec_matrix.reinit (concentration_sparsity_pattern);
         rhs_tmp.reinit(concentration_dof_handler.n_dofs());
@@ -1492,7 +1495,7 @@ namespace fem_dg
            integrate_face_term_advection_pos_bind,
            assembler3);
 
-        concentration_matrix_pos.add(time_step, concentration_face_advec_matrix);
+        concentration_matrix_pos.add(+time_step, concentration_face_advec_matrix);
 
         // build face diffusion matrix matrices
         if (rebuild_concentration_matrices)
@@ -1829,7 +1832,7 @@ namespace fem_dg
           Point<dim>  (-1,-1),
           Point<dim>  ( 1, 1));
       global_Omega_diameter = GridTools::diameter (triangulation);
-      triangulation.refine_global (4); //if want to use global uniform mesh
+      triangulation.refine_global (5); //if want to use global uniform mesh
   //    triangulation.refine_global (initial_refinement);
 
       setup_dofs();
