@@ -356,6 +356,88 @@ namespace fem_dg
         return return_value;
       }
 
+    template <int dim>
+      class ExactSolution_concentration_neg_qx : public Function<dim>
+    {
+      public:
+        ExactSolution_concentration_neg_qx () : Function<dim>(1) {}
+        virtual double value (const Point<dim>   &p, 
+            const unsigned int  component = 0) const;
+    };
+    template <int dim>
+      double
+      ExactSolution_concentration_neg_qx<dim>::value (const Point<dim> &p, 
+          const unsigned int) const
+      {
+        const double time = this->get_time ();
+        double return_value=0;
+        double pi=3.1415926;
+        return_value = -pi * sin(pi*p(0)) * cos(pi*p(1)) * cos (time);  
+        return return_value;
+      }
+
+    template <int dim>
+      class ExactSolution_concentration_neg_qy : public Function<dim>
+    {
+      public:
+        ExactSolution_concentration_neg_qy () : Function<dim>(1) {}
+        virtual double value (const Point<dim>   &p, 
+            const unsigned int  component = 0) const;
+    };
+    template <int dim>
+      double
+      ExactSolution_concentration_neg_qy<dim>::value (const Point<dim> &p, 
+          const unsigned int) const
+      {
+        const double time = this->get_time ();
+        double return_value=0;
+        double pi=3.1415926;
+        return_value = -pi * cos(pi*p(0)) * sin(pi*p(1)) * cos (time);  
+        return return_value;
+      }
+
+
+    template <int dim>
+      class ExactSolution_concentration_pos_qx : public Function<dim>
+    {
+      public:
+        ExactSolution_concentration_pos_qx () : Function<dim>(1) {}
+        virtual double value (const Point<dim>   &p, 
+            const unsigned int  component = 0) const;
+    };
+    template <int dim>
+      double
+      ExactSolution_concentration_pos_qx<dim>::value (const Point<dim> &p, 
+          const unsigned int) const
+      {
+        const double time = this->get_time ();
+        double return_value=0;
+        double pi=3.1415926;
+        return_value = -3 *pi * sin(pi*p(0)) * cos(pi*p(1)) * cos (time);  
+        return return_value;
+      }
+
+    template <int dim>
+      class ExactSolution_concentration_pos_qy : public Function<dim>
+    {
+      public:
+        ExactSolution_concentration_pos_qy () : Function<dim>(1) {}
+        virtual double value (const Point<dim>   &p, 
+            const unsigned int  component = 0) const;
+    };
+    template <int dim>
+      double
+      ExactSolution_concentration_pos_qy<dim>::value (const Point<dim> &p, 
+          const unsigned int) const
+      {
+        const double time = this->get_time ();
+        double return_value=0;
+        double pi=3.1415926;
+        return_value = -3 *pi * cos(pi*p(0)) * sin(pi*p(1)) * cos (time);  
+        return return_value;
+      }
+
+
   }
   // @sect3{The <code>DriftDiffusionProblem</code> class template}
 
@@ -415,21 +497,38 @@ namespace fem_dg
         SparseMatrix<double>                concentration_face_diffusion_matrix;
         SparseMatrix<double>                concentration_matrix_neg;
         SparseMatrix<double>                concentration_matrix_pos;
+        SparseMatrix<double>                concentration_matrix_qx;
+        SparseMatrix<double>                concentration_matrix_qy;
+        SparseMatrix<double>                concentration_matrix_ux;
+        SparseMatrix<double>                concentration_matrix_uy;
+
 
 
         Vector<double>                      concentration_solution_neg;
+        Vector<double>                      concentration_solution_qx_neg;
+        Vector<double>                      concentration_solution_qy_neg;
         Vector<double>                      exact_concentration_solution_neg;
+        Vector<double>                      exact_concentration_solution_qx_neg;
+        Vector<double>                      exact_concentration_solution_qy_neg;
         Vector<double>                      old_concentration_solution_neg;
         Vector<double>                      old_old_concentration_solution_neg;
         Vector<double>                      old_old_old_concentration_solution_neg;
         Vector<double>                      concentration_rhs_neg;
+        Vector<double>                      concentration_rhs_qx_neg;
+        Vector<double>                      concentration_rhs_qy_neg;
 
         Vector<double>                      concentration_solution_pos;
+        Vector<double>                      concentration_solution_qx_pos;
+        Vector<double>                      concentration_solution_qy_pos;
         Vector<double>                      exact_concentration_solution_pos;
+        Vector<double>                      exact_concentration_solution_qx_pos;
+        Vector<double>                      exact_concentration_solution_qy_pos;
         Vector<double>                      old_concentration_solution_pos;
         Vector<double>                      old_old_concentration_solution_pos;
         Vector<double>                      old_old_old_concentration_solution_pos;
         Vector<double>                      concentration_rhs_pos;
+        Vector<double>                      concentration_rhs_qx_pos;
+        Vector<double>                      concentration_rhs_qy_pos;
         double                              time;
         double                              time_step;
         double                              old_time_step;
@@ -480,22 +579,50 @@ namespace fem_dg
             CellInfo &info2,
             Vector<double> &coef);
         // adding diffusion operators
+        void integrate_cell_term_diffusion_x_q (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_cell_term_diffusion_y_q (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_cell_term_diffusion_x_u (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_cell_term_diffusion_y_u (DoFInfo &dinfo,
+            CellInfo &info,
+            Vector<double> &coef);
         void integrate_boundary_term_diffusion_x_u (DoFInfo &dinfo,
-            CellInfo &info);
+            CellInfo &info,
+            Vector<double> &coef);
         void integrate_boundary_term_diffusion_y_u (DoFInfo &dinfo,
-            CellInfo &info);
+            CellInfo &info,
+            Vector<double> &coef);
         void integrate_boundary_term_diffusion_x_q (DoFInfo &dinfo,
-            CellInfo &info);
+            CellInfo &info,
+            Vector<double> &coef);
         void integrate_boundary_term_diffusion_y_q (DoFInfo &dinfo,
-            CellInfo &info);
-        void integrate_face_term_diffusion_x (DoFInfo &dinfo1,
+            CellInfo &info,
+            Vector<double> &coef);
+        void integrate_face_term_diffusion_x_q (DoFInfo &dinfo1,
             DoFInfo &dinfo2,
             CellInfo &info1,
-            CellInfo &info2);
-        void integrate_face_term_diffusion_y (DoFInfo &dinfo1,
+            CellInfo &info2,
+            Vector<double> &coef);
+        void integrate_face_term_diffusion_y_q (DoFInfo &dinfo1,
             DoFInfo &dinfo2,
             CellInfo &info1,
-            CellInfo &info2);
+            CellInfo &info2,
+            Vector<double> &coef);
+        void integrate_face_term_diffusion_x_u (DoFInfo &dinfo1,
+            DoFInfo &dinfo2,
+            CellInfo &info1,
+            CellInfo &info2,
+            Vector<double> &coef);
+        void integrate_face_term_diffusion_y_u (DoFInfo &dinfo1,
+            DoFInfo &dinfo2,
+            CellInfo &info1,
+            CellInfo &info2,
+            Vector<double> &coef);
         void integrate_face_term_diffusion (DoFInfo &dinfo1,
             DoFInfo &dinfo2,
             CellInfo &info1,
@@ -697,7 +824,8 @@ namespace fem_dg
 
 
   template <int dim>
-    void DriftDiffusionProblem<dim>::integrate_face_term_advection_neg (DoFInfo &dinfo1,
+    void DriftDiffusionProblem<dim>::integrate_face_term_advection_neg (
+        DoFInfo &dinfo1,
         DoFInfo &dinfo2,
         CellInfo &info1,
         CellInfo &info2,
@@ -950,26 +1078,355 @@ namespace fem_dg
 
   template <int dim>
     void DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_x_q (DoFInfo &dinfo,
-        CellInfo &info)
+        CellInfo &info,
+        Vector<double> &coef)
     {
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            local_matrix(i,j) += normals[point](0) *
+              fe_v.shape_value(j,point) *
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
     }
 
   template <int dim>
     void DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_y_q (DoFInfo &dinfo,
-        CellInfo &info)
+        CellInfo &info,
+        Vector<double> &coef)
     {
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            local_matrix(i,j) += normals[point](1) *
+              fe_v.shape_value(j,point) *
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
     }
 
   template <int dim>
     void DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_x_u (DoFInfo &dinfo,
-        CellInfo &info)
+        CellInfo &info,
+        Vector<double> &coef)
     {
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            local_matrix(i,j) += normals[point](0) *
+              fe_v.shape_value(j,point) *
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
     }
 
   template <int dim>
     void DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_y_u (DoFInfo &dinfo,
-        CellInfo &info)
+        CellInfo &info,
+        Vector<double> &coef)
     {
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            local_matrix(i,j) += normals[point](1) *
+              fe_v.shape_value(j,point) *
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_x_q (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      // compute diffusion qx term -(sqrt{Dn}q_x,\grad\psi_x)
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+
+      double Dn = 1; //FIXME need be a parameter function
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+          {
+            local_matrix(i,j) -= Dn*fe_v.shape_grad(i,point)[0]*
+              fe_v.shape_value(j,point) *
+              JxW[point];
+          }
+        }
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_y_q (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      // compute diffusion qx term -(sqrt{Dn}q_y,\grad\psi_y)
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+
+      double Dn = 1; //FIXME need be a parameter function
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+          {
+            local_matrix(i,j) -= Dn*fe_v.shape_grad(i,point)[1]*
+              fe_v.shape_value(j,point) *
+              JxW[point];
+          }
+        }
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_x_u (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      // compute diffusion qx term -(sqrt{Dn}u,\grad\psi_x)
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+
+      double Dn = 1; //FIXME need be a parameter function
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+          {
+            local_matrix(i,j) -= Dn*fe_v.shape_grad(i,point)[0]*
+              fe_v.shape_value(j,point) *
+              JxW[point];
+          }
+        }
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_y_u (DoFInfo &dinfo,
+        CellInfo &info,
+        Vector<double> &coef)
+    {
+      // compute diffusion qx term -(sqrt{Dn}u,\grad\psi_y)
+      const FEValuesBase<dim> &fe_v = info.fe_values();
+      FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+
+      const QGauss<dim> quadrature_formula(concentration_degree+1);
+      const unsigned int n_q_points = quadrature_formula.size();
+
+      double Dn = 1; //FIXME need be a parameter function
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+        {   for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+          {
+            local_matrix(i,j) -= Dn*fe_v.shape_grad(i,point)[1]*
+              fe_v.shape_value(j,point) *
+              JxW[point];
+          }
+        }
+      }
+    }
+  
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_face_term_diffusion_x_q (
+        DoFInfo &dinfo1,
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        Vector<double> &coef)
+    {
+      //  other side value flux for q+ = q =\grad c ; in seperate subroutine use inside value 
+      //  flux for c-=c
+      const FEValuesBase<dim> &fe_v = info1.fe_values();
+      const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+      FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+      FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+      FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+      FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        // assemble the term $(\sqrt{D+}n_x^- q_x^+, v^-)_{\partial \kappa_-}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            u1_v2_matrix(i,j) += 
+              normals[point](0) *
+              fe_v.shape_value(j,point) *
+              fe_v_neighbor.shape_value(i,point) *
+              JxW[point];
+        // assemble the term $(\sqrt{D-}n_x^+ q_x^-, v^+)_{\partial \kappa_+}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v_neighbor.dofs_per_cell; ++j)
+            u2_v1_matrix(i,j) -= 
+              normals[point](0) *
+              fe_v_neighbor.shape_value(j,point) *
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
+    }
+
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_face_term_diffusion_y_q (
+        DoFInfo &dinfo1,
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        Vector<double> &coef)
+    {
+      //  other side value flux for q+ = q =\grad c ; in seperate subroutine use inside value 
+      //  flux for c-=c
+      const FEValuesBase<dim> &fe_v = info1.fe_values();
+      const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+      FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+      FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+      FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+      FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        // assemble the term $(\sqrt{D+}n_y^- q_y^+, v^-)_{\partial \kappa_-}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            u1_v2_matrix(i,j) += 
+              normals[point](1) *
+              fe_v.shape_value(j,point) *
+              fe_v_neighbor.shape_value(i,point) *
+              JxW[point];
+        // assemble the term $(\sqrt{D-}n_y^+ q_y^-, v^+)_{\partial \kappa_+}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v_neighbor.dofs_per_cell; ++j)
+            u2_v1_matrix(i,j) -=
+              normals[point](1) *
+              fe_v_neighbor.shape_value(j,point) *
+              fe_v.shape_value(i,point) *
+              JxW[point];
+      }
+    }
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_face_term_diffusion_x_u (
+        DoFInfo &dinfo1,
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        Vector<double> &coef)
+    {
+      //  use inside value flux for c- = c;
+      //  in seperate subroutine use inside value 
+      //  flux for q+ = q = \grad c
+      const FEValuesBase<dim> &fe_v = info1.fe_values();
+      const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+      FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+      FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+      FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+      FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        // assemble the term $(c^-, \sqrt{D-}n_x^-v^-)_{\partial \kappa_-}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            u1_v1_matrix(i,j) += 
+              normals[point](0) *
+              fe_v.shape_value(i,point) *
+              fe_v.shape_value(j,point) *
+              JxW[point];
+        // assemble the term $(c^+ \sqrt{D+}n_x^+ v^+)_{\partial \kappa_+}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v_neighbor.dofs_per_cell; ++j)
+            u2_v2_matrix(i,j) -= 
+              normals[point](0) *
+              fe_v_neighbor.shape_value(i,point) *
+              fe_v_neighbor.shape_value(j,point) *
+              JxW[point];
+      }
+    }
+
+
+  template <int dim>
+    void DriftDiffusionProblem<dim>::integrate_face_term_diffusion_y_u (
+        DoFInfo &dinfo1,
+        DoFInfo &dinfo2,
+        CellInfo &info1,
+        CellInfo &info2,
+        Vector<double> &coef)
+    {
+      //  use inside value flux for c- = c;
+      //  in seperate subroutine use inside value 
+      //  flux for q+ = q = \grad c
+      const FEValuesBase<dim> &fe_v = info1.fe_values();
+      const FEValuesBase<dim> &fe_v_neighbor = info2.fe_values();
+      FullMatrix<double> &u1_v1_matrix = dinfo1.matrix(0,false).matrix;
+      FullMatrix<double> &u2_v1_matrix = dinfo1.matrix(0,true).matrix;
+      FullMatrix<double> &u1_v2_matrix = dinfo2.matrix(0,true).matrix;
+      FullMatrix<double> &u2_v2_matrix = dinfo2.matrix(0,false).matrix;
+      const std::vector<double> &JxW = fe_v.get_JxW_values ();
+      const std::vector<Point<dim> > &normals = fe_v.get_normal_vectors ();
+      for (unsigned int point=0; point<fe_v.n_quadrature_points; ++point)
+      {
+        // assemble the term $(c^-, \sqrt{D-}n_y^-v^-)_{\partial \kappa_-}$,
+        for (unsigned int i=0; i<fe_v.dofs_per_cell; ++i)
+          for (unsigned int j=0; j<fe_v.dofs_per_cell; ++j)
+            u1_v1_matrix(i,j) +=
+              normals[point](1) *
+              fe_v.shape_value(i,point) *
+              fe_v.shape_value(j,point) *
+              JxW[point];
+
+        // assemble the term $(c^+ \sqrt{D+}n_y^+ v^+)_{\partial \kappa_+}$,
+        for (unsigned int k=0; k<fe_v_neighbor.dofs_per_cell; ++k)
+          for (unsigned int j=0; j<fe_v_neighbor.dofs_per_cell; ++j)
+            u2_v2_matrix(k,j) -= 
+              normals[point](1)*
+              fe_v_neighbor.shape_value(k,point) *
+              fe_v_neighbor.shape_value(j,point) *
+              JxW[point];
+      }
     }
 
   // @sect4{DriftDiffusionProblem::get_maximal_potential}
@@ -1146,6 +1603,10 @@ namespace fem_dg
         concentration_face_diffusion_matrix.clear ();
         concentration_matrix_neg.clear ();
         concentration_matrix_pos.clear ();
+        concentration_matrix_qx.clear ();
+        concentration_matrix_qy.clear ();
+        concentration_matrix_ux.clear ();
+        concentration_matrix_uy.clear ();
 
         DynamicSparsityPattern dsp2 (concentration_dof_handler.n_dofs(),
             concentration_dof_handler.n_dofs());
@@ -1159,6 +1620,10 @@ namespace fem_dg
         concentration_face_diffusion_matrix.reinit (concentration_sparsity_pattern);
         concentration_matrix_neg.reinit (concentration_sparsity_pattern);
         concentration_matrix_pos.reinit (concentration_sparsity_pattern);
+        concentration_matrix_qx.reinit (concentration_sparsity_pattern);
+        concentration_matrix_qy.reinit (concentration_sparsity_pattern);
+        concentration_matrix_ux.reinit (concentration_sparsity_pattern);
+        concentration_matrix_uy.reinit (concentration_sparsity_pattern);
       }
 
       // Lastly, we set the vectors for the Stokes solutions $\mathbf u^{n-1}$
@@ -1171,18 +1636,30 @@ namespace fem_dg
       poisson_rhs.reinit (potential_dof_handler.n_dofs());
 
       concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
+      concentration_solution_qx_neg.reinit (concentration_dof_handler.n_dofs());
+      concentration_solution_qy_neg.reinit (concentration_dof_handler.n_dofs());
       exact_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
+      exact_concentration_solution_qx_neg.reinit (concentration_dof_handler.n_dofs());
+      exact_concentration_solution_qy_neg.reinit (concentration_dof_handler.n_dofs());
       old_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
       old_old_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
       old_old_old_concentration_solution_neg.reinit (concentration_dof_handler.n_dofs());
       concentration_rhs_neg.reinit (concentration_dof_handler.n_dofs());
+      concentration_rhs_qx_neg.reinit (concentration_dof_handler.n_dofs());
+      concentration_rhs_qy_neg.reinit (concentration_dof_handler.n_dofs());
 
       concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
+      concentration_solution_qx_pos.reinit (concentration_dof_handler.n_dofs());
+      concentration_solution_qy_pos.reinit (concentration_dof_handler.n_dofs());
       exact_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
+      exact_concentration_solution_qx_pos.reinit (concentration_dof_handler.n_dofs());
+      exact_concentration_solution_qy_pos.reinit (concentration_dof_handler.n_dofs());
       old_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
       old_old_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
       old_old_old_concentration_solution_pos.reinit (concentration_dof_handler.n_dofs());
       concentration_rhs_pos.reinit (concentration_dof_handler.n_dofs());
+      concentration_rhs_qx_pos.reinit (concentration_dof_handler.n_dofs());
+      concentration_rhs_qy_pos.reinit (concentration_dof_handler.n_dofs());
     }
 
 
@@ -1292,8 +1769,8 @@ namespace fem_dg
         potential_fe_values.reinit (cell);
         cell_rhs = 0;
         concentration_fe_values.reinit (cell2);
-        concentration_fe_values.get_function_values(exact_concentration_solution_neg, concentration_values_neg);
-        concentration_fe_values.get_function_values(exact_concentration_solution_pos, concentration_values_pos);
+        concentration_fe_values.get_function_values(concentration_solution_neg, concentration_values_neg);
+        concentration_fe_values.get_function_values(concentration_solution_pos, concentration_values_pos);
         for (unsigned int i=0; i<dofs_per_cell; ++i)
         {
           for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
@@ -1355,7 +1832,7 @@ namespace fem_dg
         time_step = 1*h_min*h_min;///maximal_potential;
         std::cout << "Time step " << time_step << std::endl;
 #else
-        time_step = 0.000001;
+        time_step = 0.0001;
 #endif
       }
 
@@ -1378,11 +1855,13 @@ namespace fem_dg
 
       // build mass matrix and laplace and advection matrices
       {
-        if (rebuild_concentration_matrices)
+        //if (rebuild_concentration_matrices)
         {
           std::cout << "   Assembling concentration..." << std::endl;
           concentration_matrix_neg=0;
           concentration_matrix_pos=0;
+          concentration_advec_matrix.reinit (concentration_sparsity_pattern);
+          concentration_mass_matrix.reinit (concentration_sparsity_pattern);
           //Mass
           MatrixCreator::create_mass_matrix(concentration_dof_handler,
               QGauss<dim>(concentration_fe.degree+1),
@@ -1390,13 +1869,16 @@ namespace fem_dg
           concentration_matrix_neg.copy_from(concentration_mass_matrix);
           concentration_matrix_pos.copy_from(concentration_mass_matrix);
           //laplace
+          /*
           MatrixCreator::create_laplace_matrix(concentration_dof_handler,
               QGauss<dim>(concentration_fe.degree+1),
               concentration_laplace_matrix);
           concentration_matrix_neg.add(time_step, concentration_laplace_matrix);
           concentration_matrix_pos.add(time_step, concentration_laplace_matrix);
+          */
           // advection 
           FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
+          std::vector<double>  rhs_vector(dofs_per_cell);
           std::vector< Tensor<1,dim> >       grad_poisson_values(n_q_points);
           std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
           const EquationData::MobilityValues<dim>     mobility_func;
@@ -1425,7 +1907,7 @@ namespace fem_dg
                      grad_poisson_values[q_index]*
                      concentration_fe_values.shape_grad (i, q_index) *
                      mobility_func.value(concentration_fe_values.quadrature_point (q_index))
-                     )*
+                    )*
                     concentration_fe_values.JxW (q_index); 
                 }
                 concentration_advec_matrix.add (local_dof_indices[i],
@@ -1434,13 +1916,25 @@ namespace fem_dg
               }
             }
           }
-          concentration_matrix_neg.add(-time_step, concentration_advec_matrix);
-          concentration_matrix_pos.add(+time_step, concentration_advec_matrix);
         }
-      }// end of  build mass matrix and laplace and advection matrices
+          //concentration_matrix_neg.add(-time_step, concentration_advec_matrix);
+          //concentration_matrix_pos.add(+time_step, concentration_advec_matrix);
+          // take the advection terms explicitly to the right hand sides funtions
+          concentration_rhs_neg=0;
+          concentration_rhs_pos=0;
+          concentration_mass_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
+          concentration_mass_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
+          Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
+          rhs_tmp  = concentration_solution_neg;
+          rhs_tmp *= time_step;
+          concentration_advec_matrix.vmult_add(concentration_rhs_neg, rhs_tmp);
+          rhs_tmp  = concentration_solution_pos;
+          rhs_tmp *=-time_step;
+          concentration_advec_matrix.vmult_add(concentration_rhs_pos, rhs_tmp);
+      }// end of  build mass matrix and advection matrices, parts of the RHS
 
-      // build face advection matrix and advection matrices
       {
+        // build face advection matrix 
         MeshWorker::IntegrationInfoBox<dim> info_box;
         const unsigned int n_gauss_points = concentration_dof_handler.get_fe().degree+1;
         info_box.initialize_gauss_quadrature(n_gauss_points,
@@ -1453,17 +1947,15 @@ namespace fem_dg
         info_box.add_update_flags(update_flags, true, true, true, true);
 
         info_box.initialize(concentration_fe, mapping);
-        Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
 
         MeshWorker::DoFInfo<dim> dof_info(concentration_dof_handler);
-        // obtain advection matrix
+        // obtain advection face matrix
         concentration_advec_matrix.reinit (concentration_sparsity_pattern);
+        Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
         rhs_tmp.reinit(concentration_dof_handler.n_dofs());
         MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double> > assembler1;
         assembler1.initialize(concentration_face_advec_matrix, rhs_tmp);
         //bind definitions
-        auto integrate_cell_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_advection,
-            this, std::placeholders::_1, std::placeholders::_2, this->exact_potential_solution);
         auto integrate_boundary_term_advection_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_advection,
             this, std::placeholders::_1, std::placeholders::_2, this->exact_potential_solution);
         auto integrate_face_term_advection_neg_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_advection_neg,
@@ -1472,14 +1964,14 @@ namespace fem_dg
         MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
           (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
            dof_info, info_box,
-          // integrate_cell_term_advection_bind,
-         //  integrate_boundary_term_advection_bind,
            NULL,
            NULL,
            integrate_face_term_advection_neg_bind,
            assembler1);
 
-        concentration_matrix_neg.add(+time_step, concentration_face_advec_matrix);
+        rhs_tmp  = concentration_solution_neg;
+        rhs_tmp *= -time_step;
+        concentration_face_advec_matrix.vmult_add(concentration_rhs_neg, rhs_tmp);
         
         concentration_face_advec_matrix.reinit (concentration_sparsity_pattern);
         rhs_tmp.reinit(concentration_dof_handler.n_dofs());
@@ -1495,56 +1987,107 @@ namespace fem_dg
            integrate_face_term_advection_pos_bind,
            assembler3);
 
-        concentration_matrix_pos.add(+time_step, concentration_face_advec_matrix);
-
-        // build face diffusion matrix matrices
-        if (rebuild_concentration_matrices)
-        {
-          concentration_face_diffusion_matrix.reinit (concentration_sparsity_pattern);
-          rhs_tmp.reinit(concentration_dof_handler.n_dofs());
-       
-          MeshWorker::Assembler::SystemSimple<SparseMatrix<double>, Vector<double> > assembler2;
-       
-          assembler2.initialize(concentration_face_diffusion_matrix, rhs_tmp);
+        rhs_tmp  = concentration_solution_pos;
+        rhs_tmp *=-time_step;
+        concentration_face_advec_matrix.vmult_add(concentration_rhs_pos, rhs_tmp);
         
-          //bind definitions
-          auto integrate_face_term_diffusion_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_diffusion,
-              this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, this->potential_solution);
+        // build matriced diffusion q_x and q_y
+        concentration_matrix_qx.reinit (concentration_sparsity_pattern);
+        rhs_tmp.reinit(concentration_dof_handler.n_dofs());
+        assembler3.initialize(concentration_matrix_qx, rhs_tmp);
+        auto integrate_cell_term_diffusion_x_q_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_x_q,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qx_neg);
+        auto integrate_boundary_term_diffusion_x_q_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_x_q,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qx_neg);
+        auto integrate_face_term_diffusion_x_q_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_diffusion_x_q,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->concentration_solution_qx_neg);
+        MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
+          (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
+           dof_info, info_box,
+           integrate_cell_term_diffusion_x_q_bind,
+           integrate_boundary_term_diffusion_x_q_bind,
+           integrate_face_term_diffusion_x_q_bind,
+           assembler3);
+        
+        concentration_matrix_qy.reinit (concentration_sparsity_pattern);
+        rhs_tmp.reinit(concentration_dof_handler.n_dofs());
+        assembler3.initialize(concentration_matrix_qy, rhs_tmp);
+        auto integrate_cell_term_diffusion_y_q_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_y_q,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qy_neg);
+        auto integrate_boundary_term_diffusion_y_q_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_y_q,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qy_neg);
+        auto integrate_face_term_diffusion_y_q_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_diffusion_y_q,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->concentration_solution_qy_neg);
+        MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
+          (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
+           dof_info, info_box,
+           integrate_cell_term_diffusion_y_q_bind,
+           integrate_boundary_term_diffusion_y_q_bind,
+           integrate_face_term_diffusion_y_q_bind,
+           assembler3);
 
-          MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
-            (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
-             dof_info, info_box,
-             NULL,
-             NULL,
-             integrate_face_term_diffusion_bind,
-             assembler2);
+        rhs_tmp  = concentration_solution_qx_neg;
+        rhs_tmp *= time_step;
+        concentration_matrix_qx.vmult_add(concentration_rhs_neg, rhs_tmp);
+        rhs_tmp  = concentration_solution_qy_neg;
+        rhs_tmp *= time_step;
+        concentration_matrix_qy.vmult_add(concentration_rhs_neg, rhs_tmp);
+        
+        rhs_tmp  = concentration_solution_qx_pos;
+        rhs_tmp *= time_step;
+        concentration_matrix_qx.vmult_add(concentration_rhs_pos, rhs_tmp);
+        rhs_tmp  = concentration_solution_qy_pos;
+        rhs_tmp *= time_step;
+        concentration_matrix_qy.vmult_add(concentration_rhs_pos, rhs_tmp);
 
-          concentration_matrix_neg.add(-time_step, concentration_face_diffusion_matrix);
-          concentration_matrix_pos.add(-time_step, concentration_face_diffusion_matrix);
-          rebuild_concentration_matrices = false;
-        }
+        // build matriced diffusion u_x and u_y
+        concentration_matrix_ux.reinit (concentration_sparsity_pattern);
+        rhs_tmp.reinit(concentration_dof_handler.n_dofs());
+        assembler3.initialize(concentration_matrix_ux, rhs_tmp);
+        auto integrate_cell_term_diffusion_x_u_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_x_u,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qx_neg);
+        auto integrate_boundary_term_diffusion_x_u_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_x_u,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qx_neg);
+        auto integrate_face_term_diffusion_x_u_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_diffusion_x_u,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->concentration_solution_qx_neg);
+        MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
+          (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
+           dof_info, info_box,
+           integrate_cell_term_diffusion_x_u_bind,
+           integrate_boundary_term_diffusion_x_u_bind,
+           integrate_face_term_diffusion_x_u_bind,
+           assembler3);
+        
+        concentration_matrix_uy.reinit (concentration_sparsity_pattern);
+        rhs_tmp.reinit(concentration_dof_handler.n_dofs());
+        assembler3.initialize(concentration_matrix_uy, rhs_tmp);
+        auto integrate_cell_term_diffusion_y_u_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_cell_term_diffusion_y_u,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qy_neg);
+        auto integrate_boundary_term_diffusion_y_u_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_boundary_term_diffusion_y_u,
+            this, std::placeholders::_1, std::placeholders::_2, this->concentration_solution_qy_neg);
+        auto integrate_face_term_diffusion_y_u_bind = std::bind(&DriftDiffusionProblem<dim>::integrate_face_term_diffusion_y_u,
+            this, std::placeholders::_1, std::placeholders::_2,std::placeholders::_3, std::placeholders::_4, this->concentration_solution_qy_neg);
+        MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
+          (concentration_dof_handler.begin_active(), concentration_dof_handler.end(),
+           dof_info, info_box,
+           integrate_cell_term_diffusion_y_u_bind,
+           integrate_boundary_term_diffusion_y_u_bind,
+           integrate_face_term_diffusion_y_u_bind,
+           assembler3);
 
+        concentration_rhs_qx_neg=0;
+        concentration_rhs_qy_neg=0;
+        concentration_rhs_qx_pos=0;
+        concentration_rhs_qy_pos=0;
+
+        concentration_matrix_ux.vmult_add(concentration_rhs_qx_neg, concentration_solution_neg);
+        concentration_matrix_uy.vmult_add(concentration_rhs_qy_neg, concentration_solution_neg);
+
+        concentration_matrix_ux.vmult_add(concentration_rhs_qx_pos, concentration_solution_pos);
+        concentration_matrix_uy.vmult_add(concentration_rhs_qy_pos, concentration_solution_pos);
       }
-      // build right hand side vector
-      {
-        concentration_rhs_neg=0;
-     //   concentration_advec_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
-        concentration_rhs_neg*= -time_step;
-        Vector<double> sol_tmp (concentration_dof_handler.n_dofs());
-        concentration_mass_matrix.vmult(sol_tmp, concentration_solution_neg);
-        concentration_rhs_neg += sol_tmp;
 
-        concentration_rhs_pos=0;
-     //   concentration_advec_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
-        concentration_rhs_pos *= +time_step;
-        concentration_mass_matrix.vmult(sol_tmp, concentration_solution_pos);
-        concentration_rhs_pos += sol_tmp;
-      }
-      // DG elements dont need to apply the constraints
-      //      concentration_constraints.condense (concentration_matrix_neg, concentration_rhs_neg); 
-      //      concentration_constraints.condense (concentration_matrix_pos, concentration_rhs_pos); 
       /*
-
          EquationData::ExactSolution_concentration_neg<dim> exact_concentration_neg;
          EquationData::ExactSolution_concentration_pos<dim> exact_concentration_pos;
          exact_concentration_neg.set_time(time);
@@ -1603,7 +2146,7 @@ namespace fem_dg
         PreconditionSSOR<> preconditioner;
         preconditioner.initialize(poisson_matrix, 1.0);
         
-        //potential_solution=0;
+        potential_solution=0;
 
         cg.solve(poisson_matrix, potential_solution, poisson_rhs, preconditioner);
 
@@ -1624,43 +2167,98 @@ namespace fem_dg
         << std::endl;
 
       std::cout << "   Solving concentration..." << std::endl;
-      {
-        //SolverControl solver_control (concentration_matrix_neg.m(),
-          //  1e-6*concentration_rhs_neg.l2_norm());
-        SolverControl solver_control (1000, 1e-12);
-        SolverGMRES<> gmres(solver_control);
-        PreconditionSSOR<> preconditioner_neg;
-        preconditioner_neg.initialize(concentration_matrix_neg, 1.0);
 
-        concentration_solution_neg=0;
-        gmres.solve(concentration_matrix_neg, concentration_solution_neg, concentration_rhs_neg,
-           preconditioner_neg);
+      // solve for qnx
+      SolverControl solver_control_3 (concentration_mass_matrix.m(),
+          1e-6*concentration_rhs_qx_neg.l2_norm());
+      SolverGMRES<> gmres_3(solver_control_3);
+      PreconditionSSOR<> preconditioner_3;
+      preconditioner_3.initialize(concentration_mass_matrix, 1.0);
+      concentration_solution_qx_neg=0;
+      gmres_3.solve(concentration_mass_matrix, concentration_solution_qx_neg, concentration_rhs_qx_neg, 
+          preconditioner_3);
 
-       // concentration_constraints.distribute (concentration_solution_neg);
+      std::cout << "   "
+        << solver_control_3.last_step()
+        << "GMRES iterations for concentration equation qx."
+        << std::endl;
 
-        std::cout << "   "
-          << solver_control.last_step()
-          << "GMRES iterations for concentration equation."
-          << std::endl;
+      // solve for qny
+      SolverControl solver_control_4 (concentration_mass_matrix.m(),
+          1e-6*concentration_rhs_qy_neg.l2_norm());
+      SolverGMRES<> gmres_4(solver_control_4);
+      PreconditionSSOR<> preconditioner_4;
+      preconditioner_4.initialize(concentration_mass_matrix, 1.0);
+      concentration_solution_qy_neg=0;
+      gmres_4.solve(concentration_mass_matrix, concentration_solution_qy_neg, concentration_rhs_qy_neg, 
+          preconditioner_4);
 
-        //SolverControl solver_control_2 (concentration_matrix_pos.m(),
-          //  1e-6*concentration_rhs_pos.l2_norm());
-        SolverControl solver_control_2 (1000, 1e-12);
-        SolverGMRES<> gmres_2(solver_control_2);
-        PreconditionSSOR<> preconditioner_pos;
-        preconditioner_pos.initialize(concentration_matrix_pos, 1.0);
+      std::cout << "   "
+        << solver_control_4.last_step()
+        << "GMRES iterations for concentration equation qy."
+        << std::endl;
 
-        concentration_solution_pos=0;
-        gmres_2.solve(concentration_matrix_pos, concentration_solution_pos, concentration_rhs_pos, 
-            preconditioner_pos);
+      // solve for qpx
+      SolverControl solver_control_5 (concentration_mass_matrix.m(),
+          1e-6*concentration_rhs_qx_pos.l2_norm());
+      SolverGMRES<> gmres_5(solver_control_5);
+      PreconditionSSOR<> preconditioner_5;
+      preconditioner_5.initialize(concentration_mass_matrix, 1.0);
+      concentration_solution_qx_pos=0;
+      gmres_5.solve(concentration_mass_matrix, concentration_solution_qx_pos, concentration_rhs_qx_pos, 
+          preconditioner_5);
 
-        //concentration_constraints.distribute (concentration_solution_pos);
+      std::cout << "   "
+        << solver_control_5.last_step()
+        << "GMRES iterations for concentration equation qpx."
+        << std::endl;
 
-        std::cout << "   "
-          << solver_control_2.last_step()
-          << "GMRES iterations for concentration equation."
-          << std::endl;
-      }
+      // solve for qpy
+      SolverControl solver_control_6 (concentration_mass_matrix.m(),
+          1e-6*concentration_rhs_qy_pos.l2_norm());
+      SolverGMRES<> gmres_6(solver_control_6);
+      PreconditionSSOR<> preconditioner_6;
+      preconditioner_6.initialize(concentration_mass_matrix, 1.0);
+      concentration_solution_qy_pos=0;
+      gmres_6.solve(concentration_mass_matrix, concentration_solution_qy_pos, concentration_rhs_qy_pos, 
+          preconditioner_6);
+
+      std::cout << "   "
+        << solver_control_6.last_step()
+        << "GMRES iterations for concentration equation qpy."
+        << std::endl;
+
+      // solve for cn
+      SolverControl solver_control (concentration_matrix_neg.m(),
+          1e-6*concentration_rhs_neg.l2_norm());
+      //SolverControl solver_control (1000, 1e-12);
+      SolverGMRES<> gmres(solver_control);
+      PreconditionSSOR<> preconditioner_neg;
+      preconditioner_neg.initialize(concentration_matrix_neg, 1.0);
+
+      concentration_solution_neg=0;
+      gmres.solve(concentration_matrix_neg, concentration_solution_neg, concentration_rhs_neg,
+          preconditioner_neg);
+
+      std::cout << "   "
+        << solver_control.last_step()
+        << "GMRES iterations for concentration equation."
+        << std::endl;
+
+      // solve for cp
+      SolverControl solver_control_2 (concentration_matrix_pos.m(),
+          1e-6*concentration_rhs_pos.l2_norm());
+      SolverGMRES<> gmres_2(solver_control_2);
+      PreconditionSSOR<> preconditioner_pos;
+      preconditioner_pos.initialize(concentration_matrix_pos, 1.0);
+      concentration_solution_pos=0;
+      gmres_2.solve(concentration_matrix_pos, concentration_solution_pos, concentration_rhs_pos, 
+          preconditioner_pos);
+
+      std::cout << "   "
+        << solver_control_2.last_step()
+        << "GMRES iterations for concentration equation."
+        << std::endl;
     }
 
 
@@ -1679,12 +2277,28 @@ namespace fem_dg
           "Concentration_negative");
       data_out.add_data_vector (concentration_dof_handler, concentration_solution_pos,
           "Concentration_positive");
+      data_out.add_data_vector (concentration_dof_handler, concentration_solution_qx_neg,
+          "Concentration_qx_negative");
+      data_out.add_data_vector (concentration_dof_handler, concentration_solution_qy_neg,
+          "Concentration_qy_negative");
+      data_out.add_data_vector (concentration_dof_handler, concentration_solution_qx_pos,
+          "Concentration_qx_positive");
+      data_out.add_data_vector (concentration_dof_handler, concentration_solution_qy_pos,
+          "Concentration_qy_positive");
       data_out.add_data_vector (potential_dof_handler, exact_potential_solution,
           "Exact_Potential");
       data_out.add_data_vector (concentration_dof_handler, exact_concentration_solution_neg,
           "exact_Concentration_negative");
       data_out.add_data_vector (concentration_dof_handler, exact_concentration_solution_pos,
           "exact_Concentration_positive");
+      data_out.add_data_vector (concentration_dof_handler, exact_concentration_solution_qx_neg,
+          "exact_Concentration_qx_negative");
+      data_out.add_data_vector (concentration_dof_handler, exact_concentration_solution_qy_neg,
+          "exact_Concentration_qy_negative");
+      data_out.add_data_vector (concentration_dof_handler, exact_concentration_solution_qx_pos,
+          "exact_Concentration_qx_positive");
+      data_out.add_data_vector (concentration_dof_handler, exact_concentration_solution_qy_pos,
+          "exact_Concentration_qy_positive");
       data_out.build_patches (std::min(potential_degree, concentration_degree));
 
       std::ostringstream filename;
@@ -1863,15 +2477,39 @@ start_time_iteration:
         VectorTools::interpolate (concentration_dof_handler,
             exact_concentration_neg,
             exact_concentration_solution_neg);
-//        concentration_constraints.distribute (exact_concentration_solution_neg);
 
         EquationData::ExactSolution_concentration_pos<dim> exact_concentration_pos;
         exact_concentration_pos.set_time(time);
         VectorTools::interpolate (concentration_dof_handler,
             exact_concentration_pos,
             exact_concentration_solution_pos);
-//        concentration_constraints.distribute (exact_concentration_solution_pos);
        
+        EquationData::ExactSolution_concentration_neg_qx<dim> exact_concentration_qx_neg;
+        exact_concentration_qx_neg.set_time(time);
+        VectorTools::interpolate (concentration_dof_handler,
+            exact_concentration_qx_neg,
+            exact_concentration_solution_qx_neg);
+        
+        EquationData::ExactSolution_concentration_neg_qy<dim> exact_concentration_qy_neg;
+        exact_concentration_qy_neg.set_time(time);
+        VectorTools::interpolate (concentration_dof_handler,
+            exact_concentration_qy_neg,
+            exact_concentration_solution_qy_neg);
+
+
+        EquationData::ExactSolution_concentration_pos_qx<dim> exact_concentration_qx_pos;
+        exact_concentration_qx_pos.set_time(time);
+        VectorTools::interpolate (concentration_dof_handler,
+            exact_concentration_qx_pos,
+            exact_concentration_solution_qx_pos);
+        
+        EquationData::ExactSolution_concentration_pos_qy<dim> exact_concentration_qy_pos;
+        exact_concentration_qy_pos.set_time(time);
+        VectorTools::interpolate (concentration_dof_handler,
+            exact_concentration_qy_pos,
+            exact_concentration_solution_qy_pos);
+
+
         if (timestep_number == 0 )
         {
           concentration_solution_neg = exact_concentration_solution_neg;
