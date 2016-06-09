@@ -1920,11 +1920,16 @@ namespace fem_dg
           //concentration_matrix_neg.add(-time_step, concentration_advec_matrix);
           //concentration_matrix_pos.add(+time_step, concentration_advec_matrix);
           // take the advection terms explicitly to the right hand sides funtions
-          concentration_rhs_neg=0;
-          concentration_rhs_pos=0;
-          concentration_mass_matrix.vmult(concentration_rhs_neg, concentration_solution_neg);
-          concentration_mass_matrix.vmult(concentration_rhs_pos, concentration_solution_pos);
-          Vector<double> rhs_tmp (concentration_dof_handler.n_dofs());
+          Vector<double> rhs_tmp  (concentration_dof_handler.n_dofs());
+          Vector<double> rhs_tmp2 (concentration_dof_handler.n_dofs());
+          concentration_mass_matrix.vmult(rhs_tmp, concentration_rhs_neg);
+          concentration_mass_matrix.vmult(rhs_tmp2, concentration_rhs_pos);
+          rhs_tmp *= time_step;
+          rhs_tmp2 *= time_step;
+          concentration_rhs_neg = rhs_tmp;
+          concentration_rhs_pos = rhs_tmp2;
+          concentration_mass_matrix.vmult_add(concentration_rhs_neg, concentration_solution_neg);
+          concentration_mass_matrix.vmult_add(concentration_rhs_pos, concentration_solution_pos);
           rhs_tmp  = concentration_solution_neg;
           rhs_tmp *= time_step;
           concentration_advec_matrix.vmult_add(concentration_rhs_neg, rhs_tmp);
@@ -2496,7 +2501,6 @@ start_time_iteration:
             exact_concentration_qy_neg,
             exact_concentration_solution_qy_neg);
 
-
         EquationData::ExactSolution_concentration_pos_qx<dim> exact_concentration_qx_pos;
         exact_concentration_qx_pos.set_time(time);
         VectorTools::interpolate (concentration_dof_handler,
@@ -2510,6 +2514,18 @@ start_time_iteration:
             exact_concentration_solution_qy_pos);
 
 
+        EquationData::ConcentrationNegativeRightHandSide<dim> rhs_neg;
+        rhs_neg.set_time(time);
+        VectorTools::interpolate (concentration_dof_handler,
+            rhs_neg,
+            concentration_rhs_neg);
+        
+        EquationData::ConcentrationPositiveRightHandSide<dim> rhs_pos;
+        rhs_pos.set_time(time);
+        VectorTools::interpolate (concentration_dof_handler,
+            rhs_pos,
+            concentration_rhs_pos);
+       
         if (timestep_number == 0 )
         {
           concentration_solution_neg = exact_concentration_solution_neg;
